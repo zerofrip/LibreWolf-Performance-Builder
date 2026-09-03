@@ -1,0 +1,108 @@
+name: Baseline Windows x64 LibreWolf
+
+# Phase 2: upstream-equivalent Windows x64 package.
+# Intentionally disables LTO/PGO/x86-64-v3. Failures must not fall back.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/baseline-windows.yml"
+      - "scripts/**"
+      - "configs/mozconfig.baseline.frag"
+      - "upstream/**"
+  pull_request:
+    paths:
+      - ".github/workflows/baseline-windows.yml"
+      - "scripts/**"
+      - "configs/mozconfig.baseline.frag"
+      - "upstream/**"
+
+concurrency:
+  group: baseline-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  local-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Local validation (pins, scripts, source fetch)
+        run: bash scripts/local-validate.sh
+
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-local-validate
+          path: |
+            artifacts/
+            work/*.source.tar.gz.sha256
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-windows-baseline:
+    needs: local-validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 720
+    container:
+      image: codeberg.org/librewolf/bsys6:windows
+      options: --user root
+    env:
+      TARGET: windows
+      ARCH: x86_64
+      # Explicitly empty / unset optimization knobs
+      LTO: ""
+      MOZ_PGO: ""
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v4
+
+      - name: Disk before
+        run: bash scripts/disk-report.sh gha-before
+
+      - name: Install git/curl/jq if missing
+        run: |
+          if ! command -v jq >/dev/null || ! command -v git >/dev/null; then
+            apt-get update
+            apt-get install -y jq git curl ca-certificates
+          fi
+
+      - name: Cache pinned source tarball
+        uses: actions/cache@v4
+        with:
+          path: work/librewolf-155.0-1.source.tar.gz
+          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
+
+      - name: Verify baseline config (no opt overlays)
+        run: bash scripts/verify-baseline-config.sh
+
+      - name: Build upstream-equivalent Windows package
+        run: bash scripts/build-windows-baseline.sh
+
+      - name: Disk after
+        if: always()
+        run: bash scripts/disk-report.sh gha-after
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-windows-x64
+          path: |
+            out/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail if build metadata status is not ok
+        run: |
+          test -f artifacts/baseline-windows-metadata.json
+          jq -e '.status == "ok"' artifacts/baseline-windows-metadata.json
+          jq -e '.optimizations.lto == false and .optimizations.pgo == false and .optimizations.x86_64_v3 == false' \
+            artifacts/baseline-windows-metadata.json

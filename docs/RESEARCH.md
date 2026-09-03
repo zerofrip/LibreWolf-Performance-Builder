@@ -300,6 +300,21 @@ Performance regressions are acceptable. Privacy/security regressions are not.
 
 ---
 
+
+## GHA run 33754159563 — Windows target triple break (2026-09-03)
+
+**CONFIRMED:** Firefox 155 rejects `x86_64-pc-mingw32` (`init.configure` `check_mingw_triplet`).
+
+**CONFIRMED:** Pinned GitLab bsys6 `1ca7388` generated `x86_64-pc-mingw32` via `src/exports/target.sh`.
+
+**CONFIRMED:** Run 33754159563 failed at configure; disk remained ~68–74 GB free (not ENOSPC).
+
+**CONFIRMED:** Codeberg bsys6 commit `0ed119d` (`Use windows-msvc everywhere for x86_64`) and tag `155.0-1` (`24c40ff`) set Windows x86_64 to `x86_64-pc-windows-msvc`. That is the intended Linux-hosted Windows cross-build triple for current upstream (Rust/Docker already on `windows-msvc`).
+
+**CONFIRMED:** Prefer updating the bsys6 pin to Codeberg `155.0-1` over maintaining a local mingw→msvc patch.
+
+**UNKNOWN until rerun:** full GitHub-hosted baseline success after pin update.
+
 ## Open UNKNOWN register (must stay open until closed with evidence)
 
 | ID | Item |

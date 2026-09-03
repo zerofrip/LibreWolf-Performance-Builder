@@ -170,3 +170,13 @@ Small commits per working phase. Do not squash unrelated phases.
 2. Implement Phase 2 scripts + GitHub Actions baseline workflow
 3. Run locally available validation
 4. Stop and report evidence before Phase 3/4 work
+
+## Compatibility note (Firefox 155 / bsys6)
+
+Phase 2 must pin **Codeberg** bsys6 tag `155.0-1` (`24c40ff…`), which emits `x86_64-pc-windows-msvc`.
+
+Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` — Firefox 155 configure rejects that triple.
+
+`scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
+
+Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.

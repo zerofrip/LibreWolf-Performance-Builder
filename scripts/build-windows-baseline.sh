@@ -39,6 +39,17 @@ export SOURCE_URL="${LWPB_SOURCE_URL}"
 export WORKDIR="${WORKDIR:-${ROOT}/work/bsys6-work}"
 mkdir -p "$WORKDIR"
 
+# Prefer the bsys6 Windows image toolchain layout when present.
+# GitHub Actions container jobs often set HOME=/github/home, which would make
+# mozconfig's WINSYSROOT=$MOZBUILD/win-cross/vs miss /root/.mozbuild.
+if [[ -d /root/.mozbuild/win-cross/vs ]]; then
+  export HOME=/root
+  export MOZBUILD=/root/.mozbuild
+  export MOZBUILD_STATE_PATH=/root/.mozbuild
+  export PATH="/root/.cargo/bin:/root/.mozbuild/clang/bin:${PATH}"
+  echo "-> Using image toolchain MOZBUILD=${MOZBUILD} HOME=${HOME}"
+fi
+
 # Refuse optimization env even if caller exports later
 unset LTO MOZ_PGO MOZ_PROFILE_GENERATE MOZ_PROFILE_USE || true
 
@@ -98,4 +109,5 @@ TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 STATUS="ok"
 echo "Phase 2 baseline package complete: $ARTIFACT"
+
 

@@ -60,6 +60,12 @@ jobs:
       ARCH: x86_64
       LTO: ""
       MOZ_PGO: ""
+      # GHA container jobs force HOME=/github/home; the bsys6 Windows image
+      # installs the VS/Windows SDK under /root/.mozbuild (see Dockerfile.windows).
+      HOME: /root
+      MOZBUILD: /root/.mozbuild
+      MOZBUILD_STATE_PATH: /root/.mozbuild
+      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
     steps:
       - name: Checkout overlay
         uses: actions/checkout@v4
@@ -114,3 +120,4 @@ jobs:
               exit 1
             fi
           fi
+

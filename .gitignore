@@ -1,0 +1,23 @@
+# Generated / large artifacts
+/work/
+/out/
+/artifacts/
+*.zip
+*.exe
+*.msix
+*.nupkg
+*.tar.gz
+*.tar.xz
+*.profraw
+*.profdata
+*.log
+
+# Local clones
+/vendor/
+/bsys6/
+/librewolf-*/
+
+# Tooling
+.mozbuild/
+__pycache__/
+.DS_Store

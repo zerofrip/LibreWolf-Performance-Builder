@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: MPL-2.0
+
+This repository is a build/optimization overlay.
+
+- LibreWolf and Mozilla Firefox source code remain under the Mozilla Public License 2.0.
+- Scripts and documentation authored in this overlay are provided under the Mozilla Public License, v. 2.0.
+- This project is not affiliated with the LibreWolf Community or Mozilla.
+- Do not treat builds from this repository as official LibreWolf releases unless the LibreWolf Community explicitly says otherwise.
+
+You can obtain a copy of the MPL at https://mozilla.org/MPL/2.0/.

@@ -34,3 +34,18 @@ MOZ_TARGET=$ARCH-pc-mingw32  →  $ARCH-pc-windows-msvc
 - Whether GitHub-hosted baseline completes end-to-end after the pin update
 - Peak disk / LLVM / Rust versions from a successful container build
 - Final package name / size / SHA-256
+
+## GHA run 33756336955 (FAILED — new blocker after triple fix)
+
+**CONFIRMED:** `local-validate` PASS with `MOZ_TARGET=x86_64-pc-windows-msvc` (bsys6 `24c40ff`).
+
+**CONFIRMED:** configure accepted `--target=x86_64-pc-windows-msvc` / `checking for target system type... x86_64-pc-windows-msvc` (mingw32 reject gone).
+
+**CONFIRMED:** build then failed with `ERROR: Cannot find a Windows SDK for version >= 0x0603`.
+
+**CONFIRMED:** configure used `WINSYSROOT=/github/home/.mozbuild/win-cross/vs` because GHA container sets `HOME=/github/home`, while `Dockerfile.windows` installs the SDK at `/root/.mozbuild/win-cross/vs`.
+
+**CONFIRMED:** still not a disk failure (avail ~75G → ~68G).
+
+**Fix applied:** set `HOME=/root`, `MOZBUILD=/root/.mozbuild` for the build job (and mirror in `build-windows-baseline.sh` when the image SDK exists).
+

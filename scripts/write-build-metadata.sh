@@ -43,7 +43,7 @@ jq -n \
   --arg phase "2-baseline" \
   --arg target "windows" \
   --arg arch "x86_64" \
-  --arg moz_target "x86_64-pc-mingw32" \
+  --arg moz_target "${LWPB_WINDOWS_TARGET_X64:-x86_64-pc-windows-msvc}" \
   --arg librewolf_version "$LWPB_FULL_VERSION" \
   --arg firefox_version "$LWPB_FIREFOX_VERSION" \
   --arg bsys6_rev "$LWPB_BSYS6_REV" \
@@ -60,7 +60,7 @@ jq -n \
   --arg artifact_sha256 "$ARTIFACT_SHA" \
   --arg artifact_size "$ARTIFACT_SIZE" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --argjson optimizations '{"lto":false,"pgo":false,"x86_64_v3":false,"csir":false}' \
+  --argjson optimizations '{"lto":false,"pgo":"upstream-if-profdata","x86_64_v3":false,"csir":false,"overlay_optimizations":false}' \
   '{
     status: $status,
     phase: $phase,
@@ -88,3 +88,4 @@ jq -n \
 
 echo "Wrote metadata $OUT"
 cat "$OUT"
+

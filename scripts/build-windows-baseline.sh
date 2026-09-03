@@ -43,9 +43,10 @@ mkdir -p "$WORKDIR"
 unset LTO MOZ_PGO MOZ_PROFILE_GENERATE MOZ_PROFILE_USE || true
 
 "${ROOT}/scripts/fetch-bsys6.sh" "${ROOT}/work/bsys6"
-# shellcheck source=fetch-bsys6.sh
-# LWPB_BSYS6_DIR set by fetch script when sourced; re-export from known path:
 export LWPB_BSYS6_DIR="${ROOT}/work/bsys6"
+
+# Fail before mach if obsolete mingw32 triple would be generated
+TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 "${ROOT}/scripts/fetch-source.sh" "${ROOT}/work"
 export SOURCE_TAR="${LWPB_SOURCE_TAR:-${ROOT}/work/librewolf-${LWPB_FULL_VERSION}.source.tar.gz}"
@@ -60,6 +61,7 @@ echo "-> Running bsys6 package (TARGET=${TARGET} ARCH=${ARCH} VERSION=${VERSION}
 echo "-> FORGE_URL=${FORGE_URL}"
 echo "-> SOURCE_TAR=${SOURCE_TAR}"
 echo "-> WORKDIR=${WORKDIR}"
+echo "-> Expected MOZ_TARGET=${LWPB_WINDOWS_TARGET_X64}"
 
 # Use absolute SOURCE_TAR so bsys6 skips broken default package host logic
 export SOURCE_TAR
@@ -84,8 +86,16 @@ ARTIFACT="${ROOT}/out/${ARTIFACT_NAME}"
 cp -f "$ARTIFACT_SRC" "$ARTIFACT"
 sha256sum "$ARTIFACT" | tee "${ARTIFACT}.sha256"
 
+# Capture the mozconfig target line for evidence
+if [[ -f "${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig" ]]; then
+  grep -E '^ac_add_options --target=' "${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig" \
+    | tee "${ROOT}/artifacts/generated-target.txt" || true
+fi
+
 # Double-check we did not accidentally enable LTO via env mid-build
 "${ROOT}/scripts/verify-baseline-config.sh"
+TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 STATUS="ok"
 echo "Phase 2 baseline package complete: $ARTIFACT"
+

@@ -1,7 +1,8 @@
 name: Baseline Windows x64 LibreWolf
 
-# Phase 2: upstream-equivalent Windows x64 package.
-# Intentionally disables LTO/PGO/x86-64-v3. Failures must not fall back.
+# Phase 2: upstream-equivalent Windows x64 package (bsys6 tag 155.0-1).
+# Overlay does not enable LTO / x86-64-v3 / CSIR. Failures must not fall back.
+# Note: upstream bsys6 may inject --enable-profile-use when assets/windows.profdata exists.
 
 on:
   workflow_dispatch:
@@ -25,12 +26,12 @@ concurrency:
 jobs:
   local-validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install jq
-        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Install jq and git-lfs
+        run: sudo apt-get update && sudo apt-get install -y jq git-lfs
 
       - name: Local validation (pins, scripts, source fetch)
         run: bash scripts/local-validate.sh
@@ -51,12 +52,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 720
     container:
+      # Prefer Codeberg-published image (worked for toolchain bootstrap in run 33754159563).
       image: codeberg.org/librewolf/bsys6:windows
       options: --user root
     env:
       TARGET: windows
       ARCH: x86_64
-      # Explicitly empty / unset optimization knobs
       LTO: ""
       MOZ_PGO: ""
     steps:
@@ -66,12 +67,11 @@ jobs:
       - name: Disk before
         run: bash scripts/disk-report.sh gha-before
 
-      - name: Install git/curl/jq if missing
+      - name: Install git/curl/jq/git-lfs if missing
         run: |
-          if ! command -v jq >/dev/null || ! command -v git >/dev/null; then
-            apt-get update
-            apt-get install -y jq git curl ca-certificates
-          fi
+          apt-get update
+          apt-get install -y jq git curl ca-certificates git-lfs
+          git lfs install
 
       - name: Cache pinned source tarball
         uses: actions/cache@v4
@@ -79,7 +79,7 @@ jobs:
           path: work/librewolf-155.0-1.source.tar.gz
           key: lw-source-${{ hashFiles('upstream/metadata.json') }}
 
-      - name: Verify baseline config (no opt overlays)
+      - name: Verify baseline config (no overlay LTO/PGO env)
         run: bash scripts/verify-baseline-config.sh
 
       - name: Build upstream-equivalent Windows package
@@ -104,5 +104,13 @@ jobs:
         run: |
           test -f artifacts/baseline-windows-metadata.json
           jq -e '.status == "ok"' artifacts/baseline-windows-metadata.json
-          jq -e '.optimizations.lto == false and .optimizations.pgo == false and .optimizations.x86_64_v3 == false' \
+          jq -e '.moz_target == "x86_64-pc-windows-msvc"' artifacts/baseline-windows-metadata.json
+          jq -e '.optimizations.lto == false and .optimizations.x86_64_v3 == false and .optimizations.csir == false' \
             artifacts/baseline-windows-metadata.json
+          if [[ -f artifacts/generated-target.txt ]]; then
+            grep -F 'x86_64-pc-windows-msvc' artifacts/generated-target.txt
+            if grep -E 'mingw32|mingw64' artifacts/generated-target.txt; then
+              echo "ERROR: generated mozconfig still contains mingw triple" >&2
+              exit 1
+            fi
+          fi

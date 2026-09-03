@@ -3,11 +3,14 @@
   "firefox_version": "155.0",
   "source_git": "https://codeberg.org/librewolf/source.git",
   "source_rev": "03ba053934d5f6c7a11cb472424017caafd607e9",
-  "bsys6_git": "https://gitlab.com/librewolf-community/browser/bsys6.git",
-  "bsys6_rev": "1ca738899aeece8aad2f2811cbb00b707786ee33",
+  "bsys6_git": "https://codeberg.org/librewolf/bsys6.git",
+  "bsys6_rev": "24c40ffaa25b558e4c5ce9f326bc4466ba7608bc",
+  "bsys6_tag": "155.0-1",
+  "bsys6_windows_target_x86_64": "x86_64-pc-windows-msvc",
+  "bsys6_target_migration_commit": "0ed119d2f821d1472cadeef6dd9bc5f7ae64c187",
   "source_tarball_url": "https://librewolf.dev/api/packages/librewolf/generic/librewolf-source/155.0-1/librewolf-155.0-1.source.tar.gz",
   "source_tarball_sha256": "5d951d8071ef6bcc4eab8bba1492e269af728c83586437ec2a7db11d46be36f6",
   "forge_url_for_packages": "https://librewolf.dev",
   "bsys6_default_forge_url": "https://codeberg.org",
-  "note": "bsys6 defaults FORGE_URL to codeberg.org which 404s for source packages; override FORGE_URL or SOURCE_URL"
+  "note": "Pin bsys6 to Codeberg tag 155.0-1 (not stale GitLab master). That revision maps Windows x86_64 to x86_64-pc-windows-msvc (commit 0ed119d). GitLab mirror at 1ca7388 still emitted obsolete x86_64-pc-mingw32 rejected by Firefox 155."
 }

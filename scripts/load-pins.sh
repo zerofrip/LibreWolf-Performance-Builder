@@ -22,6 +22,7 @@ META_SOURCE="$(jq -r .source_rev "$META")"
 SOURCE_URL="$(jq -r .source_tarball_url "$META")"
 SOURCE_SHA256="$(jq -r .source_tarball_sha256 "$META")"
 FORGE_URL="$(jq -r .forge_url_for_packages "$META")"
+WIN_TARGET="$(jq -r .bsys6_windows_target_x86_64 "$META")"
 
 [[ "$META_VERSION" == "$FULL_VERSION" ]] || die "metadata librewolf_version ($META_VERSION) != ${FULL_VERSION}"
 [[ "$META_BSYS6" == "$BSYS6_REV" ]] || die "metadata bsys6_rev mismatch"
@@ -29,6 +30,7 @@ FORGE_URL="$(jq -r .forge_url_for_packages "$META")"
 [[ "$SOURCE_URL" == https://* ]] || die "SOURCE_URL must be https"
 [[ "$SOURCE_SHA256" =~ ^[0-9a-f]{64}$ ]] || die "invalid source sha256"
 [[ "$FORGE_URL" == "https://librewolf.dev" ]] || die "unexpected FORGE_URL pin: $FORGE_URL"
+[[ "$WIN_TARGET" == "x86_64-pc-windows-msvc" ]] || die "unexpected Windows x64 target pin: $WIN_TARGET"
 
 # Export for callers
 export LWPB_ROOT="$ROOT"
@@ -44,8 +46,11 @@ export LWPB_BSYS6_GIT
 LWPB_BSYS6_GIT="$(jq -r .bsys6_git "$META")"
 export LWPB_FIREFOX_VERSION
 LWPB_FIREFOX_VERSION="$(jq -r .firefox_version "$META")"
+export LWPB_WINDOWS_TARGET_X64="$WIN_TARGET"
 
 echo "Pins OK: LibreWolf ${LWPB_FULL_VERSION} (Firefox ${LWPB_FIREFOX_VERSION})"
-echo "  bsys6 ${LWPB_BSYS6_REV}"
+echo "  bsys6 ${LWPB_BSYS6_REV} (${LWPB_BSYS6_GIT})"
+echo "  windows x86_64 target ${LWPB_WINDOWS_TARGET_X64}"
 echo "  source ${LWPB_SOURCE_REV}"
 echo "  tarball ${LWPB_SOURCE_URL}"
+

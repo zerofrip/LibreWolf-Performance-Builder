@@ -90,12 +90,23 @@ unset LTO MOZ_PGO MOZ_PROFILE_GENERATE MOZ_PROFILE_USE || true
 # shellcheck source=ci-resource-guard.sh
 source "${ROOT}/scripts/ci-resource-guard.sh"
 
-# Install compiler logging wrappers (TARGET evidence capture)
+# Install compiler logging wrappers on PATH (must be named clang/clang++).
+# Do NOT set CC=/path/to/*.sh — Firefox configure rejects non-clang basenames
+# ("Unknown compiler or compiler not supported", run 33927389796).
 REAL_CLANG="$(command -v clang)"
 REAL_CLANGXX="$(command -v clang++)"
 REAL_RUSTC="$(command -v rustc)"
 [[ -n "$REAL_CLANG" && -n "$REAL_CLANGXX" && -n "$REAL_RUSTC" ]] \
   || { echo "ERROR: clang/clang++/rustc required" >&2; exit 1; }
+
+# Prefer image clang as the real backend even after PATH wrap
+if [[ -x /root/.mozbuild/clang/bin/clang ]]; then
+  REAL_CLANG=/root/.mozbuild/clang/bin/clang
+  REAL_CLANGXX=/root/.mozbuild/clang/bin/clang++
+fi
+if [[ -x /root/.cargo/bin/rustc ]]; then
+  REAL_RUSTC=/root/.cargo/bin/rustc
+fi
 
 WRAPPER="${ROOT}/scripts/wrappers/compiler-log-wrapper.sh"
 RUST_WRAPPER="${ROOT}/scripts/wrappers/rustc-log-wrapper.sh"
@@ -104,27 +115,26 @@ chmod +x "$WRAPPER" "$RUST_WRAPPER" \
   "${ROOT}/scripts/prove-march-v3.sh" "${ROOT}/scripts/verify-v3-config.sh" \
   "${ROOT}/scripts/check-privacy-invariants.sh"
 
-# CC/CXX wrappers: log then exec real compilers
-export LWPB_REAL_CLANG="$REAL_CLANG"
-export LWPB_REAL_CLANGXX="$REAL_CLANGXX"
-# Thin shell frontends so each kind is distinct
-cat >"${ROOT}/artifacts/logs/cc-wrap.sh" <<EOF
+WRAP_BIN="${ROOT}/artifacts/logs/wrap-bin"
+mkdir -p "$WRAP_BIN"
+cat >"${WRAP_BIN}/clang" <<EOF
 #!/usr/bin/env bash
 export LWPB_WRAPPER_KIND=clang
 export LWPB_REAL_COMPILER="${REAL_CLANG}"
 export LWPB_COMPILER_LOG="${LWPB_COMPILER_LOG}"
 exec "${WRAPPER}" "\$@"
 EOF
-cat >"${ROOT}/artifacts/logs/cxx-wrap.sh" <<EOF
+cat >"${WRAP_BIN}/clang++" <<EOF
 #!/usr/bin/env bash
 export LWPB_WRAPPER_KIND=clangxx
 export LWPB_REAL_COMPILER="${REAL_CLANGXX}"
 export LWPB_COMPILER_LOG="${LWPB_COMPILER_LOG}"
 exec "${WRAPPER}" "\$@"
 EOF
-chmod +x "${ROOT}/artifacts/logs/cc-wrap.sh" "${ROOT}/artifacts/logs/cxx-wrap.sh"
-export CC="${ROOT}/artifacts/logs/cc-wrap.sh"
-export CXX="${ROOT}/artifacts/logs/cxx-wrap.sh"
+chmod +x "${WRAP_BIN}/clang" "${WRAP_BIN}/clang++"
+# Prepend wrap-bin so configure resolves basename "clang"
+export PATH="${WRAP_BIN}:${PATH}"
+unset CC CXX || true
 export RUSTC_WRAPPER="$RUST_WRAPPER"
 
 "${ROOT}/scripts/probe-toolchain.sh" "${ROOT}/artifacts/toolchain-probe.txt"

@@ -14,7 +14,7 @@ Pinned revisions for this audit (also in `upstream/`):
 | LibreWolf version | `155.0-1` |
 | Firefox version | `155.0` |
 | source.git | `03ba053934d5f6c7a11cb472424017caafd607e9` (codeberg.org/librewolf/source) |
-| bsys6 | `1ca738899aeece8aad2f2811cbb00b707786ee33` (gitlab.com/librewolf-community/browser/bsys6) |
+| bsys6 | `24c40ffaa25b558e4c5ce9f326bc4466ba7608bc` (codeberg.org/librewolf/bsys6 tag `155.0-1`) |
 | Source tarball | `https://librewolf.dev/api/packages/librewolf/generic/librewolf-source/155.0-1/librewolf-155.0-1.source.tar.gz` |
 | Source tarball SHA-256 | `5d951d8071ef6bcc4eab8bba1492e269af728c83586437ec2a7db11d46be36f6` |
 
@@ -49,19 +49,41 @@ Active mirrors: Codeberg (`librewolf/source`, `librewolf/bsys6`) and GitLab comm
 **CONFIRMED**
 
 - Host: x86_64 Linux only (`bsys6/README.md`)
-- Env: `TARGET=windows`, `ARCH=x86_64` → `MOZ_TARGET=x86_64-pc-mingw32` (`src/exports/target.sh`)
-- Prepare: Windows cross deps, rustup targets `x86_64-pc-windows-msvc` (+ arm64/i686), Mozilla toolchain artifacts, WinSDK, Chocolatey (`src/prepare.sh`)
-- Mozconfig composition (`src/source.sh`):
+- Env: `TARGET=windows`, `ARCH=x86_64` → `MOZ_TARGET=x86_64-pc-windows-msvc` (`src/exports/target.sh` at tag `155.0-1` / commit `0ed119d`)
+- Prepare: Windows cross deps, rustup targets `x86_64-pc-windows-msvc` (+ arm64), Mozilla toolchain artifacts, WinSDK (`src/prepare.sh`, `Dockerfile.windows`)
+- Mozconfig composition (`src/source.sh` @ `24c40ff`):
   1. backup of tarball `mozconfig`
   2. `ac_add_options --target=$MOZ_TARGET`
   3. append `assets/windows.mozconfig`
-  4. optional `LTO` → Windows uses `--enable-lto=thin`
+  4. optional `LTO=true` → `--enable-lto=full,cross` (both Windows and non-Windows)
+  5. if `assets/$TARGET.profdata` exists → `--with-pgo-profile-path=...` + `--enable-profile-use`
 - Build: `./mach build` inside source dir (`src/build.sh`)
 - Package: multi-locale package; Windows artifact is `librewolf-*.zip` (`src/package.sh`)
 
-`assets/windows.mozconfig` sets bootstrap, WinSYSROOT, MIDL/FXC, `MOZ_APP_REMOTINGNAME=LibreWolf`.
+`assets/windows.mozconfig` sets sandbox, WinSYSROOT, MIDL/FXC, l10n base.
 
-Official release workflow uses container `codeberg.org/librewolf/bsys6:windows` on self-hosted runner `epsilon` (`.forgejo/workflows/build-release.yml`).
+### Official Windows CI model (bsys6 `.forgejo/workflows/build-release.yml` @ `24c40ff`)
+
+**CONFIRMED**
+
+| Item | Evidence |
+|------|----------|
+| Runner | `runs-on: epsilon` (self-hosted Forgejo runner label) |
+| Container | `librewolf.dev/librewolf/bsys6:windows` |
+| Matrix | `arch: [x86_64, arm64]`, `max-parallel: 2` |
+| Command | `./bsys6 package setup msix portable nupkg` |
+| Overlay C/C++ LTO | `LTO: ${{ inputs.lto }}` with workflow_dispatch default **`false`** |
+| Container memory/swap | **not** set in the workflow YAML (no `options: --memory=...`, no swap config) |
+| Machine class / RAM | **UNKNOWN** — no public epsilon RAM/CPU/swap docs found in bsys6 README or workflow |
+| Historical Full LTO RAM | commit `36f8c3df` message: *“remove LTO for Windows since it is taking more than 128 GB to link”* |
+
+Official releases therefore run on a **larger unknown self-hosted class** (`epsilon`), not GitHub-hosted `ubuntu-latest`.
+
+**GitHub-hosted RAM (documentation vs authoritative):**
+
+- Public-repo standard `ubuntu-latest` is documented by GitHub as **4 CPUs / 16 GB RAM** ([GitHub-hosted runners reference](https://docs.github.com/en/actions/reference/runners/github-hosted-runners#standard-github-hosted-runners-for-public-repositories)).
+- Private-repo standard `ubuntu-latest` is documented as **2 CPUs / 8 GB RAM**.
+- This repository is **public**, so the *documented* host VM class is 4/16 — but jobs use `container:`, so the **authoritative** limit is the process-visible cgroup (`memory.max` / `memory.peak` / `memory.events`) captured in `artifacts/memory-summary.json`. Do **not** assume host RAM equals container cgroup limit.
 
 ---
 
@@ -82,35 +104,67 @@ GitHub-hosted Ubuntu can host the cross build if disk/RAM suffice and the Window
 
 ## 4. Current Firefox / LibreWolf PGO
 
-**CONFIRMED**
+**CONFIRMED (corrected 2026-09-04)**
 
-LibreWolf upstream mozconfig (`source/assets/mozconfig`) has **no** `MOZ_PGO`, `--enable-profile-generate`, or `--enable-profile-use`.
+LibreWolf source tarball mozconfig still has no hand-written PGO flags, **but bsys6 injects upstream profile-use when Git LFS profdata is present**:
 
-Firefox supported path (`firefox-source-docs` + `build/moz.configure/lto-pgo.configure`):
+```text
+# bsys6 src/source.sh @ 24c40ff
+if [ -f "$BSYS6/../assets/$TARGET.profdata" ]; then
+  ac_add_options --with-pgo-profile-path=...
+  ac_add_options --enable-profile-use
+fi
+```
 
-- `MOZ_PGO=1` ≈ instrumented build → `build/pgo/profileserver.py` → profile-use build
-- Flags for Clang: `-fprofile-generate` / `-fprofile-use=<profdata>`
-- Windows target: also `-mllvm -enable-name-compression=false` for cross-compile profile readability
-- Cross-language (Rust) PGO requires `=cross` choice
+- `assets/windows.profdata` is a Git LFS object (~116 668 272 bytes per LFS pointer oid `8aa61ee6…`)
+- Official Forgejo workflow runs `git lfs pull` before Windows builds
+- GHA run `33854319687` configure log shows both flags active; also `Activating PGO-based orderfile`
 
-Firefox tree contains **no** CSIR / `-fcs-profile-generate` usage (code search empty at audit time).
+Firefox supported path (`build/moz.configure/lto-pgo.configure` on mozilla-firefox/firefox `release`):
+
+- `--enable-profile-use` / `--with-pgo-profile-path`
+- Flags for Clang: `-fprofile-use=<profdata>` (+ Windows name-compression note for generate)
+- Cross-language (Rust) PGO requires `=cross` choice (`MOZ_PGO_RUST`) — **not** what bsys6 passes today (plain `--enable-profile-use`)
+
+Firefox tree contains **no** CSIR / `-fcs-profile-generate` usage (Phase 0 search).
 
 ---
 
-## 5. Current LTO
+## 5. Current LTO (four distinct layers)
 
-**CONFIRMED**
+**CONFIRMED — distinguish carefully**
 
-- bsys6: LTO is **opt-in** via env `LTO`
-- Windows + LTO → `--enable-lto=thin` (`src/source.sh`)
-- Non-Windows + LTO → `--enable-lto=full`
-- Historical: Full LTO for Windows was removed because linking needed **>128 GB RAM** (commit `36f8c3df`); Thin was tried (`4c7d2b0c`)
+| Layer | How enabled | Official Windows default (`LTO` input false) | Run 33854319687 |
+|-------|-------------|-----------------------------------------------|-----------------|
+| Overlay LTO (this repo) | our mozconfig / env | N/A | **OFF** |
+| bsys6 `--enable-lto=…` | `LTO=true` → `--enable-lto=full,cross` (`src/source.sh` @ `24c40ff`) | **OFF** (workflow default false) | **OFF** (configure options list has no `--enable-lto`) |
+| Upstream C/C++ LTO | Firefox `MOZ_LTO` from `--enable-lto` | inactive unless LTO input true | **INACTIVE** |
+| Upstream Rust `gkrust` LTO | Firefox `config/makefiles/rust.mk` adds `-Clto` (+ later `codegen-units=1`) for release staticlib when **not** `MOZ_LTO_RUST_CROSS` | **ACTIVE** (expected) | **ACTIVE** (`rustc … -Clto … -C codegen-units=1`) |
 
-Mozilla `lto-pgo.configure`: for automated PGO builds on x86_64 Windows/Linux, Full LTO may be selected when `MOZ_AUTOMATION` + PGO are set, based on Speedometer3 benefit. Thin is otherwise common.
+Evidence for Rust default LTO (mozilla-firefox/firefox `release` `config/makefiles/rust.mk`):
+
+```make
+# Enable link-time optimization for release builds, but not when linking
+# gkrust_gtest. And not when doing cross-language LTO.
+ifndef MOZ_LTO_RUST_CROSS
+...
+cargo_rustc_flags += -Clto$(if $(filter full,$(MOZ_LTO_RUST_CROSS)),=fat)
+...
+$(TARGET_RECIPES) $(HOST_RECIPES): RUSTFLAGS += -C codegen-units=1
+```
+
+So **`gkrust -Clto -C codegen-units=1` is expected in the official Windows baseline even when bsys6 `LTO=false`.** It is not proof that overlay LTO or bsys6 `--enable-lto` is on.
+
+bsys6 history:
+
+- `36f8c3df` — remove unconditional Windows `--enable-lto=full` (*“taking more than 128 GB to link”*)
+- `24c40ff` — when `LTO=true`, use `--enable-lto=full,cross` (cross-language)
+
+Mozilla `lto-pgo.configure`: if `--enable-lto` is passed with empty/`cross` only **and** `MOZ_AUTOMATION` + PGO + Win/Linux x86_64, Full may be selected. That path does **not** apply when `--enable-lto` is absent.
 
 **Implication for this project**
 
-ThinLTO is the correct **initial default** here because of LibreWolf/GHA resource limits — **not** because Full LTO is invalid on Windows in Mozilla’s own automation.
+Do not disable upstream profile-use or Firefox default Rust `gkrust` LTO merely to fit GHA. ThinLTO remains the preferred **overlay** default when we later opt into `--enable-lto`, because LibreWolf documented >128 GB for Windows Full C/C++ LTO link.
 
 ---
 
@@ -291,12 +345,26 @@ Performance regressions are acceptable. Privacy/security regressions are not.
 
 ## Incorrect assumptions corrected by this audit
 
-1. Upstream LibreWolf Windows builds are not PGO by default.  
-2. Firefox `MOZ_PGO=1` is not CSIR.  
-3. Full LTO is valid in Mozilla automation for some Win/Linux PGO builds, but LibreWolf/GHA cannot treat it as default.  
-4. `FORGE_URL=https://codeberg.org` (bsys6 default) **404s** for current `librewolf-source` packages; working host is `https://librewolf.dev`.  
-5. AVX2 bytes in a binary ≠ x86-64-v3 baseline.  
+1. ~~Upstream LibreWolf Windows builds are not PGO by default.~~ **Corrected:** when `assets/windows.profdata` (Git LFS) is present, bsys6 enables `--enable-profile-use` (run `33854319687`, `src/source.sh` @ `24c40ff`).
+2. Firefox `MOZ_PGO=1` is not CSIR.
+3. Full C/C++ LTO is valid in Mozilla automation for some Win/Linux PGO builds, but LibreWolf keeps `LTO` workflow-default **false**; when opted in (tag `155.0-1`) it uses `--enable-lto=full,cross` and historically needed >128 GB for Windows link (`36f8c3df`).
+4. `FORGE_URL=https://codeberg.org` (bsys6 default) **404s** for current `librewolf-source` packages; working host is `https://librewolf.dev`.
+5. AVX2 bytes in a binary ≠ x86-64-v3 baseline.
 6. Rust `-C target-cpu=x86-64-v3` is unproven until probed on the pinned Windows target rustc.
+7. Metadata `"lto": false` must **not** mean “no rustc `-Clto`”. Firefox `rust.mk` enables `gkrust` crate LTO for release staticlibs independently of bsys6 `LTO`.
+
+### Upstream-equivalent Windows baseline (definition)
+
+```text
+LibreWolf upstream-equivalent Windows baseline:
+- uses pinned upstream windows.profdata when bsys6 provides it (Git LFS);
+- enables upstream --enable-profile-use / --with-pgo-profile-path;
+- may compile gkrust with Firefox default -Clto / codegen-units=1 (rust.mk);
+- does NOT set bsys6 LTO=true / --enable-lto unless explicitly opted in;
+- contains no OUR optimization overlay (no x86-64-v3, no CSIR, no overlay LTO).
+```
+
+Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green unless explicitly authorized.
 
 ---
 
@@ -322,6 +390,9 @@ Performance regressions are acceptable. Privacy/security regressions are not.
 | U1 | Windows `.profraw` consumable by Linux cross Clang without silent corruption |
 | U2 | Exact Clang CSIR merge semantics for current LLVM used by Mozilla toolchain |
 | U3 | SkyKakapo custom compiler requirements |
-| U4 | GHA-hosted complete Windows LibreWolf build feasibility (disk/time) |
+| U4 | GHA-hosted complete Windows LibreWolf build feasibility (disk/time/**RAM for gkrust -Clto**) |
 | U5 | rustc support for `x86-64-v3` on `x86_64-pc-windows-*` |
 | U6 | Wine-based Windows profile collection viability |
+| U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
+| U8 | Whether cgroup `oom_kill` / kernel OOM lines are readable on GHA container jobs |
+

@@ -16,7 +16,15 @@ ThinLTO           (default LTO mode)
 CSIR PGO          (Phase 4+, only after PoC evidence)
 ```
 
-Phase 2 (current authorization) targets an **upstream-equivalent** Windows x64 package with **no** v3 / PGO / LTO overlays.
+Phase 2 (current authorization) targets an **upstream-equivalent** Windows x64 package with **no OUR** v3 / CSIR / overlay-LTO flags.
+
+Upstream-equivalent is **not** “PGO off / LTO off”:
+
+```text
+- pinned windows.profdata (when present) → --enable-profile-use
+- Firefox rust.mk → gkrust -Clto / codegen-units=1 on release staticlib
+- bsys6 LTO env default false → no --enable-lto C/C++ cross LTO
+```
 
 ## Non-goals (default OFF / experimental)
 
@@ -117,9 +125,25 @@ Keep generic x86_64 and x86-64-v3 as separate configs/artifacts for comparison.
 
 ### 3.3 ThinLTO vs Full LTO documentation
 
-- **Default here:** ThinLTO (`--enable-lto=thin`), matching current LibreWolf bsys6 Windows LTO behavior
-- **Correction:** current Mozilla Firefox may select **Full LTO** for automated PGO x86_64 Windows/Linux builds where upstream benchmarking found benefit (`lto-pgo.configure` + `MOZ_AUTOMATION`)
-- Full LTO remains **experimental in this repository** because of LibreWolf history (>128 GB Windows link) and GitHub Actions resource constraints — **not** because Full LTO is inherently invalid
+- **Overlay default (later phases):** ThinLTO (`--enable-lto=thin`) for resource-constrained builders
+- **Current bsys6 when `LTO=true` (tag `155.0-1` / `24c40ff`):** `--enable-lto=full,cross` (not thin)
+- **Mozilla:** may select Full LTO for automation+PGO x86_64 Win/Linux when `--enable-lto` is enabled (`lto-pgo.configure`)
+- **LibreWolf history:** Windows Full C/C++ LTO link needed >128 GB (`36f8c3df`) — keep Full as experimental here
+- **Always-on Firefox behavior:** `gkrust` release staticlib uses Rust `-Clto` via `rust.mk` even when bsys6 `LTO=false` — this is part of the upstream-equivalent baseline, not an overlay
+
+## Infrastructure options (evaluate; do not apply without approval)
+
+Ranked for Phase 2 completion while preserving upstream PGO + Firefox Rust gkrust LTO:
+
+| Rank | Option | Upstream fidelity | Cost | Repro | Maintenance | Future CSIR PGO |
+|------|--------|-------------------|------|-------|-------------|-----------------|
+| 1 | **B. Self-hosted high-RAM runner** (epsilon-like) | Highest (matches official topology) | CapEx/OpEx | High if documented | Medium | Best (local profiles + large link) |
+| 2 | **A. GitHub larger runners** (e.g. 16–64 GiB+) | High (same scripts/image) | Pay-per-minute | High | Low | Good if RAM enough for CSIR stages |
+| 3 | **E. Official LibreWolf CI model** (epsilon + bsys6:windows) | Exact | Needs access | High | Low for us if we can use it | N/A unless we gain runner access |
+| 4 | **C/D. External / container swap** | High fidelity of flags; slower | Low | Medium (swap availability varies) | Low | Marginal help for peak RSS |
+| 5 | **F. Reusable prebuilt upstream artifacts** | Lower for *our* compile proof | Low | Medium | Medium | Poor — skips the build we must validate |
+
+GHA standard `ubuntu-latest` (public docs: 4 CPU / 16 GB host VM) remains **unproven** for finishing `gkrust` fat Rust LTO inside the bsys6 container until cgroup evidence is collected; do not weaken baseline flags before trying higher-memory runners.
 
 ## Phase 4–5 gates (not authorized yet)
 
@@ -180,3 +204,4 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+

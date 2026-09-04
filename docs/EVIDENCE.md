@@ -76,4 +76,71 @@ MOZ_TARGET=$ARCH-pc-mingw32  →  $ARCH-pc-windows-msvc
 
 **Minimal repair for next run:** `MOZ_MAKE_FLAGS=-j2`, optional swap, toolchain probe, stdout/file heartbeats, tee mach logs, split `bsys6 source` then inject parallelism into mozconfig before `build package`.
 
+## GHA run 33854319687 (FAILED — gkrust rustc SIGKILL)
+
+| Field | Value |
+|-------|-------|
+| Commit | `705247bea17c34b645e9ccba5b544d4a91ac21b9` |
+| Duration | ~2105 s (~35 min) to failure |
+| Disk at failure | ~62 GiB free (`heartbeat` / `gha-after`) — **NOT blocker** |
+| Swap | Attempted 8G; **unavailable** in container |
+| First fail | `could not compile gkrust (lib)` — rustc `(signal: 9, SIGKILL: kill)` |
+| rustc flags | `-Clto` … `-C codegen-units=1` (full gkrust crate LTO) |
+| Configure PGO | `--enable-profile-use` + `--with-pgo-profile-path=.../assets/windows.profdata` |
+| Configure C/C++ LTO | **absent** (no `--enable-lto`) |
+| Metadata bug | claimed `"lto": false` while Rust LTO was active — semantics fixed to overlay vs upstream layers |
+
+**CONFIRMED**
+
+- Target triple `x86_64-pc-windows-msvc` PASS
+- MOZBUILD/SDK / clang 21.1.8 / rustc 1.97.1 PASS
+- Configure complete; deep C/C++ + Rust compile progressed
+- Upstream PGO profile-use **ACTIVE**
+- Upstream bsys6 `--enable-lto` **INACTIVE**
+- Upstream Firefox `gkrust` Rust LTO **ACTIVE** (expected via `rust.mk`, not overlay)
+
+**OOM status: STRONGLY SUSPECTED (not CONFIRMED)**
+
+- SIGKILL during multi-minute `gkrust` LTO on GHA-hosted runner is consistent with memory killer / cgroup OOM
+- Disk exhaustion disproved
+- This run did **not** capture readable cgroup `oom_kill` / kernel OOM lines (heartbeat lacked MemAvailable; `free` may be missing in image)
+- Next runs add `scripts/memory-report.sh` (meminfo, ulimit, cgroup v1/v2 `memory.current|peak|events`, best-effort dmesg)
+
+**Do not** disable upstream PGO or Rust gkrust LTO to greenwash GHA without explicit authorization.
+
+### Phase decision gate (33854319687)
+
+```text
+RUN: 33854319687
+TARGET TRIPLE: PASS
+MOZBUILD: PASS
+CONFIGURE: PASS
+C/C++ COMPILE: PASS to observed point
+RUST COMPILE: PASS until gkrust final staticlib/LTO
+FIRST FAILING COMPONENT: gkrust
+FAILURE: rustc SIGKILL during -Clto, codegen-units=1
+DISK: NOT BLOCKER
+OOM: STRONGLY SUSPECTED
+UPSTREAM PGO: ACTIVE
+UPSTREAM RUST LTO: ACTIVE
+GITHUB-HOSTED BASELINE FEASIBILITY: UNLIKELY (pending authoritative cgroup evidence on a fresh instrumented run)
+RECOMMENDED INFRASTRUCTURE: collect cgroup memory.max/peak/oom_kill on standard public GHA (docs: 4CPU/16GB host VM); then self-hosted high-RAM (epsilon-class) or optional larger runners; keep upstream PGO + rust.mk LTO
+PHASE 2: BLOCKED
+```
+
+## Infrastructure recovery (2026-09-04)
+
+**CONFIRMED direction:** do not weaken upstream PGO / Firefox `gkrust -Clto`; add runner abstraction + memory evidence instead.
+
+| Piece | Location |
+|-------|----------|
+| Memory samples + summary | `scripts/memory-report.sh` → `artifacts/disk/memory-samples.jsonl`, `artifacts/memory-summary.json` |
+| Proven optimization layers | `scripts/detect-optimization-state.sh` |
+| Reusable build job | `.github/workflows/baseline-windows-reusable.yml` |
+| Standard / selectable runners | `.github/workflows/baseline-windows.yml` (`runner_profile`) |
+| Self-hosted manual wrapper | `.github/workflows/baseline-windows-self-hosted.yml` + `docs/SELF-HOSTED.md` |
+
+Public-repo GitHub docs list `ubuntu-latest` as **4 CPU / 16 GB**; authoritative job limit remains cgroup `memory_limit_bytes` when non-null.
+
+
 

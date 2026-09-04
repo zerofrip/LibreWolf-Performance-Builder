@@ -1,0 +1,27 @@
+{
+  "phase": "3-x86-64-v3",
+  "target_os": "Windows",
+  "target_architecture": "x86_64",
+  "target_triple": "x86_64-pc-windows-msvc",
+  "cpu_baseline": "x86-64-v3",
+  "host_specific_tuning": false,
+  "x86_64_v4": false,
+  "requested": {
+    "c_x86_64_v3": true,
+    "cpp_x86_64_v3": true,
+    "rust_x86_64_v3": true,
+    "overlay_lto": false,
+    "overlay_pgo": false,
+    "upstream_cpp_lto": false,
+    "upstream_rust_lto": true,
+    "upstream_pgo": true,
+    "csir": false
+  },
+  "c_mechanism": "-march=x86-64-v3",
+  "cpp_mechanism": "-march=x86-64-v3",
+  "rust_mechanism": "-C target-cpu=x86-64-v3",
+  "notes": [
+    "requested.* is the Phase 3 contract; proven.* must come from probe/build evidence",
+    "AVX2 bytes in the PE are NOT sufficient proof of an x86-64-v3 baseline"
+  ]
+}

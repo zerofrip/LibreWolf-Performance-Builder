@@ -53,13 +53,14 @@ if [[ -z "$MOZCONFIG" || ! -f "$MOZCONFIG" ]]; then
   [[ -n "$cand" ]] && MOZCONFIG="$cand"
 fi
 
-OPT_JSON="$("${ROOT}/scripts/detect-optimization-state.sh" "${MOZCONFIG:-}" "${BUILD_LOG:-}")"
+OPT_JSON="$("${ROOT}/scripts/detect-optimization-state.sh" "${MOZCONFIG:-}" "${BUILD_LOG:-}" "${ROOT}/artifacts/v3-proof.json")"
 
 RUNNER_PROFILE="${LWPB_RUNNER_PROFILE:-unknown}"
+PHASE_NAME="${LWPB_BUILD_PHASE:-2-baseline}"
 
 jq -n \
   --arg status "$STATUS" \
-  --arg phase "2-baseline" \
+  --arg phase "$PHASE_NAME" \
   --arg target "windows" \
   --arg arch "x86_64" \
   --arg moz_target "${LWPB_WINDOWS_TARGET_X64:-x86_64-pc-windows-msvc}" \
@@ -109,3 +110,4 @@ jq -n \
 
 echo "Wrote metadata $OUT"
 cat "$OUT"
+

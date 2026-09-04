@@ -390,9 +390,10 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 | U1 | Windows `.profraw` consumable by Linux cross Clang without silent corruption |
 | U2 | Exact Clang CSIR merge semantics for current LLVM used by Mozilla toolchain |
 | U3 | SkyKakapo custom compiler requirements |
-| U4 | GHA-hosted complete Windows LibreWolf build feasibility (disk/time/**RAM for gkrust -Clto**) |
+| U4 | ~~GHA-hosted complete Windows LibreWolf build feasibility~~ → **CLOSED for standard public ubuntu-latest**: OOM CONFIRMED on run `33862245103` (`oom_kill=1`, peak ~14.56 GiB). Higher-memory infra required. |
 | U5 | rustc support for `x86-64-v3` on `x86_64-pc-windows-*` |
 | U6 | Wine-based Windows profile collection viability |
 | U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
 | U8 | Whether cgroup `oom_kill` / kernel OOM lines are readable on GHA container jobs |
+
 

@@ -142,5 +142,45 @@ PHASE 2: BLOCKED
 
 Public-repo GitHub docs list `ubuntu-latest` as **4 CPU / 16 GB**; authoritative job limit remains cgroup `memory_limit_bytes` when non-null.
 
+## GHA run 33862245103 (FAILED — OOM CONFIRMED)
+
+| Field | Value |
+|-------|-------|
+| Commit | `5ca1290` (docs + memory infra + reusable runner) |
+| Duration | ~2334 s |
+| Result | `gkrust` rustc SIGKILL during `-Clto` |
+| MemTotal (visible) | 16377684 kB (~15.62 GiB) |
+| cgroup `memory.max` | `max` → summary `memory_limit_bytes: null` (no lower cgroup cap) |
+| cgroup `memory.peak` | 15628947456 (~14.56 GiB) |
+| cgroup `oom` | 0 |
+| cgroup `oom_kill` | **1** (was 0 at start) |
+| Upstream PGO | proven `true` (mozconfig) |
+| Upstream Rust LTO | proven `true` (build-log `-Clto`) |
+| Overlay opts | all false |
+
+**OOM: CONFIRMED** via cgroup v2 `memory.events` `oom_kill=1` coincident with `gkrust` SIGKILL and peak RSS near host MemTotal. Kernel dmesg unreadable (`Operation not permitted`).
+
+Do **not** repeatedly retry standard GHA for this baseline after this confirmation.
+
+```text
+STANDARD GHA:
+memory.max: max (null limit below host)
+memory.peak: 15628947456 (~14.56 GiB)
+oom: 0
+oom_kill: 1
+result: FAILURE (gkrust SIGKILL)
+
+SELF-HOSTED WORKFLOW:
+READY (workflow) / NOT READY (no registered runners)
+
+LARGER RUNNER:
+OPTIONAL / UNKNOWN for this personal public repo
+
+PHASE 2:
+BLOCKED ON INFRASTRUCTURE
+```
+
+
+
 
 

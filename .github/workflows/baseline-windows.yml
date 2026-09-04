@@ -88,7 +88,14 @@ jobs:
       - name: Verify baseline config (no overlay LTO/PGO env)
         run: bash scripts/verify-baseline-config.sh
 
+      - name: Probe image toolchain paths
+        run: bash scripts/probe-toolchain.sh artifacts/toolchain-probe-pre.txt
+
       - name: Build upstream-equivalent Windows package
+        env:
+          # Cap parallelism to reduce OOM / runner-loss on github-hosted VMs.
+          MOZ_MAKE_FLAGS: "-j2"
+          LWPB_TRY_SWAP: "1"
         run: bash scripts/build-windows-baseline.sh
 
       - name: Disk after
@@ -120,4 +127,5 @@ jobs:
               exit 1
             fi
           fi
+
 

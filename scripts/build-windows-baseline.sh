@@ -7,14 +7,26 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 export DISK_REPORT_DIR="${ROOT}/artifacts/disk"
-mkdir -p "${ROOT}/artifacts" "${ROOT}/work" "${ROOT}/out" "$DISK_REPORT_DIR"
+mkdir -p "${ROOT}/artifacts" "${ROOT}/work" "${ROOT}/out" "$DISK_REPORT_DIR" "${ROOT}/artifacts/logs"
 
 START_TS="$(date +%s)"
 STATUS="failed"
 ARTIFACT=""
+HEARTBEAT_PID=""
+
+stop_heartbeat() {
+  if [[ -f "${ROOT}/artifacts/disk/heartbeat.pid" ]]; then
+    kill "$(cat "${ROOT}/artifacts/disk/heartbeat.pid")" 2>/dev/null || true
+    rm -f "${ROOT}/artifacts/disk/heartbeat.pid"
+  fi
+  if [[ -n "${HEARTBEAT_PID}" ]]; then
+    kill "${HEARTBEAT_PID}" 2>/dev/null || true
+  fi
+}
 
 cleanup_meta() {
   local end duration
+  stop_heartbeat
   end="$(date +%s)"
   duration="$((end - START_TS))"
   "${ROOT}/scripts/write-build-metadata.sh" \
@@ -53,6 +65,12 @@ fi
 # Refuse optimization env even if caller exports later
 unset LTO MOZ_PGO MOZ_PROFILE_GENERATE MOZ_PROFILE_USE || true
 
+# CI resource guard (parallelism cap + heartbeat). Not an optimization overlay.
+# shellcheck source=ci-resource-guard.sh
+source "${ROOT}/scripts/ci-resource-guard.sh"
+
+"${ROOT}/scripts/probe-toolchain.sh" "${ROOT}/artifacts/toolchain-probe.txt"
+
 "${ROOT}/scripts/fetch-bsys6.sh" "${ROOT}/work/bsys6"
 export LWPB_BSYS6_DIR="${ROOT}/work/bsys6"
 
@@ -68,18 +86,61 @@ export SOURCE_TAR="${LWPB_SOURCE_TAR:-${ROOT}/work/librewolf-${LWPB_FULL_VERSION
 BSYS6="${LWPB_BSYS6_DIR}/bsys6"
 [[ -x "$BSYS6" ]] || { echo "ERROR: bsys6 launcher missing at $BSYS6" >&2; exit 1; }
 
-echo "-> Running bsys6 package (TARGET=${TARGET} ARCH=${ARCH} VERSION=${VERSION})"
+echo "-> Preparing source (bsys6 source)"
 echo "-> FORGE_URL=${FORGE_URL}"
 echo "-> SOURCE_TAR=${SOURCE_TAR}"
 echo "-> WORKDIR=${WORKDIR}"
 echo "-> Expected MOZ_TARGET=${LWPB_WINDOWS_TARGET_X64}"
+echo "-> MOZ_MAKE_FLAGS=${MOZ_MAKE_FLAGS:-}"
 
-# Use absolute SOURCE_TAR so bsys6 skips broken default package host logic
 export SOURCE_TAR
 (
   cd "${LWPB_BSYS6_DIR}"
-  ./bsys6 package
-)
+  ./bsys6 source
+) 2>&1 | tee "${ROOT}/artifacts/logs/bsys6-source.log"
+
+MOZCONFIG_PATH="${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig"
+MOZCONFIG_BACKUP="${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig.backup"
+[[ -f "$MOZCONFIG_PATH" ]] || { echo "ERROR: mozconfig missing at $MOZCONFIG_PATH" >&2; exit 1; }
+[[ -f "$MOZCONFIG_BACKUP" ]] || { echo "ERROR: mozconfig.backup missing at $MOZCONFIG_BACKUP" >&2; exit 1; }
+
+# Record effective target before build
+grep -E '^ac_add_options --target=' "$MOZCONFIG_PATH" | tee "${ROOT}/artifacts/generated-target.txt"
+if grep -E 'mingw32|mingw64' "${ROOT}/artifacts/generated-target.txt"; then
+  echo "ERROR: obsolete mingw triple in mozconfig" >&2
+  exit 1
+fi
+grep -F 'x86_64-pc-windows-msvc' "${ROOT}/artifacts/generated-target.txt" \
+  || { echo "ERROR: expected x86_64-pc-windows-msvc in mozconfig" >&2; exit 1; }
+
+# Persist CI parallelism in mozconfig.backup so bsys6 source.sh regenerations keep it.
+if ! grep -q 'LWPB_CI_RESOURCE_GUARD' "$MOZCONFIG_BACKUP"; then
+  {
+    echo ""
+    echo "# LWPB_CI_RESOURCE_GUARD: GitHub-hosted runner memory/CPU cap (not an optimization)"
+    echo "mk_add_options MOZ_MAKE_FLAGS=\"${MOZ_MAKE_FLAGS:--j2}\""
+  } >>"$MOZCONFIG_BACKUP"
+fi
+# Force mozconfig regenerate from backup + windows.mozconfig + our guard.
+rm -f "${MOZCONFIG_PATH}.hash"
+(
+  cd "${LWPB_BSYS6_DIR}"
+  ./bsys6 source
+) 2>&1 | tee -a "${ROOT}/artifacts/logs/bsys6-source.log"
+
+grep -q 'LWPB_CI_RESOURCE_GUARD' "$MOZCONFIG_PATH" \
+  || { echo "ERROR: CI resource guard missing from regenerated mozconfig" >&2; exit 1; }
+echo "-> Effective mozconfig resource lines:" | tee "${ROOT}/artifacts/logs/mozconfig-resource.txt"
+grep -E 'MOZ_MAKE_FLAGS|LWPB_CI_RESOURCE|--target=' "$MOZCONFIG_PATH" \
+  | tee -a "${ROOT}/artifacts/logs/mozconfig-resource.txt"
+
+"${ROOT}/scripts/disk-report.sh" before-build
+
+echo "-> Running bsys6 build package (TARGET=${TARGET} ARCH=${ARCH} VERSION=${VERSION})"
+(
+  cd "${LWPB_BSYS6_DIR}"
+  ./bsys6 build package
+) 2>&1 | tee "${ROOT}/artifacts/logs/bsys6-build-package.log"
 
 "${ROOT}/scripts/disk-report.sh" after-package
 
@@ -97,17 +158,12 @@ ARTIFACT="${ROOT}/out/${ARTIFACT_NAME}"
 cp -f "$ARTIFACT_SRC" "$ARTIFACT"
 sha256sum "$ARTIFACT" | tee "${ARTIFACT}.sha256"
 
-# Capture the mozconfig target line for evidence
-if [[ -f "${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig" ]]; then
-  grep -E '^ac_add_options --target=' "${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig" \
-    | tee "${ROOT}/artifacts/generated-target.txt" || true
-fi
+# Refresh generated-target evidence after build
+grep -E '^ac_add_options --target=' "$MOZCONFIG_PATH" \
+  | tee "${ROOT}/artifacts/generated-target.txt" || true
 
-# Double-check we did not accidentally enable LTO via env mid-build
 "${ROOT}/scripts/verify-baseline-config.sh"
 TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 STATUS="ok"
 echo "Phase 2 baseline package complete: $ARTIFACT"
-
-

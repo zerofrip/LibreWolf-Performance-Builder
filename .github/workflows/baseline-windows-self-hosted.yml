@@ -3,7 +3,8 @@ name: Baseline Windows (self-hosted manual)
 # Thin wrapper: same reusable build as baseline-windows.yml.
 # Requires a registered runner with labels:
 #   self-hosted, linux, x64, librewolf-builder
-# See docs/SELF-HOSTED.md. Do not run until such a runner is available.
+# See docs/SELF-HOSTED.md.
+# Do not run until such a runner is online (type READY).
 
 on:
   workflow_dispatch:
@@ -29,7 +30,7 @@ jobs:
           if [[ "$CONFIRM" != "READY" ]]; then
             echo "Refusing to start: confirm_runner_ready must be READY" >&2
             echo "Register a runner with labels: self-hosted linux x64 librewolf-builder" >&2
-            echo "See docs/SELF-HOSTED.md" >&2
+            echo "Recommended RAM: 32 GiB first trial / 64 GiB preferred (see docs/SELF-HOSTED.md)" >&2
             exit 1
           fi
 

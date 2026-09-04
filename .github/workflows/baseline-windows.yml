@@ -1,24 +1,36 @@
 name: Baseline Windows x64 LibreWolf
 
-# Phase 2: upstream-equivalent Windows x64 package (bsys6 tag 155.0-1).
-# Push/PR always use standard GitHub-hosted runners.
-# Manual dispatch may select self-hosted or optional larger-custom labels.
+# Phase 2 lightweight checks on push/PR (local-validate only).
+# Full upstream-equivalent browser build is MANUAL-ONLY:
+#   - known OOM on standard public ubuntu-latest (run 33862245103)
+#   - use workflow_dispatch with runner_profile=self-hosted (preferred)
+#   - standard full build remains available for diagnostics only (expect OOM)
 # Overlay does not enable LTO / x86-64-v3 / CSIR. Upstream PGO + rust.mk gkrust LTO remain.
 
 on:
   workflow_dispatch:
     inputs:
       runner_profile:
-        description: "Runner profile (standard = GitHub-hosted ubuntu-latest)"
+        description: "Full-build runner (self-hosted preferred; standard = known-insufficient diagnostics)"
         required: true
         type: choice
-        default: standard
+        default: self-hosted
         options:
-          - standard
           - self-hosted
+          - standard
           - larger-custom
       larger_runner_label:
-        description: "Only for larger-custom — org-defined larger runner label (e.g. ubuntu-latest-m)"
+        description: "Only for larger-custom — org-defined larger runner label"
+        required: false
+        type: string
+        default: ""
+      run_full_build:
+        description: "Run full upstream-equivalent Windows build (expensive)"
+        required: true
+        type: boolean
+        default: true
+      acknowledge_standard_oom:
+        description: "Required if runner_profile=standard — type UNDERSTAND-OOM"
         required: false
         type: string
         default: ""
@@ -26,6 +38,7 @@ on:
     paths:
       - ".github/workflows/baseline-windows.yml"
       - ".github/workflows/baseline-windows-reusable.yml"
+      - ".github/workflows/baseline-windows-self-hosted.yml"
       - "scripts/**"
       - "configs/mozconfig.baseline.frag"
       - "upstream/**"
@@ -33,12 +46,13 @@ on:
     paths:
       - ".github/workflows/baseline-windows.yml"
       - ".github/workflows/baseline-windows-reusable.yml"
+      - ".github/workflows/baseline-windows-self-hosted.yml"
       - "scripts/**"
       - "configs/mozconfig.baseline.frag"
       - "upstream/**"
 
 concurrency:
-  group: baseline-windows-${{ github.ref }}-${{ github.event_name }}-${{ inputs.runner_profile || 'standard' }}
+  group: baseline-windows-${{ github.ref }}-${{ github.event_name }}-${{ inputs.runner_profile || 'validate' }}
   cancel-in-progress: true
 
 jobs:
@@ -65,8 +79,9 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  # Resolve runs-on JSON for the reusable build job.
+  # Full build is never started by push/PR — only workflow_dispatch.
   select-runner:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_full_build
     needs: local-validate
     runs-on: ubuntu-latest
     outputs:
@@ -75,30 +90,29 @@ jobs:
     steps:
       - id: sel
         env:
-          EVENT_NAME: ${{ github.event_name }}
-          PROFILE_IN: ${{ inputs.runner_profile || 'standard' }}
+          PROFILE_IN: ${{ inputs.runner_profile }}
           LARGER_LABEL: ${{ inputs.larger_runner_label || '' }}
+          ACK_OOM: ${{ inputs.acknowledge_standard_oom || '' }}
         run: |
           set -euo pipefail
-          # Push/PR always stay on standard GitHub-hosted.
-          if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
-            PROFILE=standard
-          else
-            PROFILE="$PROFILE_IN"
-          fi
+          PROFILE="$PROFILE_IN"
           case "$PROFILE" in
             standard)
+              if [ "$ACK_OOM" != "UNDERSTAND-OOM" ]; then
+                echo "ERROR: standard full build is known-insufficient (OOM on run 33862245103)." >&2
+                echo "Set acknowledge_standard_oom=UNDERSTAND-OOM for diagnostics only, or use self-hosted." >&2
+                exit 1
+              fi
               JSON='"ubuntu-latest"'
               ;;
             self-hosted)
               JSON='["self-hosted","linux","x64","librewolf-builder"]'
               ;;
             larger-custom)
-              if [[ -z "$LARGER_LABEL" ]]; then
+              if [ -z "$LARGER_LABEL" ]; then
                 echo "ERROR: larger-custom requires larger_runner_label input" >&2
                 exit 1
               fi
-              # JSON-encode a single label string
               JSON="$(jq -cn --arg l "$LARGER_LABEL" '$l')"
               ;;
             *)
@@ -115,6 +129,7 @@ jobs:
           echo "Selected profile=$PROFILE runs_on_json=$JSON"
 
   build-windows-baseline:
+    if: github.event_name == 'workflow_dispatch' && inputs.run_full_build
     needs: [local-validate, select-runner]
     uses: ./.github/workflows/baseline-windows-reusable.yml
     with:

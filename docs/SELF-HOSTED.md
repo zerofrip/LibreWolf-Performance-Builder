@@ -5,6 +5,15 @@ Only the runner selector changes; pins, container image, scripts, mozconfig
 handling, metadata, and artifacts stay identical via
 `.github/workflows/baseline-windows-reusable.yml`.
 
+## Status
+
+| Item | Status |
+|------|--------|
+| Reusable full-build workflow | Ready |
+| Manual self-hosted wrapper | Ready (`baseline-windows-self-hosted.yml`) |
+| Registered runner with required labels | **Not ready** until an operator registers one |
+| Standard GitHub-hosted full build | **Insufficient** (OOM CONFIRMED, run `33862245103`) — not used on push |
+
 ## Labels
 
 Register the GitHub Actions runner with **all** of:
@@ -39,23 +48,35 @@ The runner user must be able to run Docker containers (often via `docker` group)
 
 ## Workflows
 
-| Workflow | Trigger | Runner |
-|----------|---------|--------|
-| `baseline-windows.yml` | push/PR | always `ubuntu-latest` (standard) |
-| `baseline-windows.yml` | `workflow_dispatch` + `runner_profile=self-hosted` | self-hosted labels |
-| `baseline-windows-self-hosted.yml` | manual only; requires typing `READY` | self-hosted labels |
+| Workflow | Trigger | What runs |
+|----------|---------|-----------|
+| `baseline-windows.yml` | push/PR | **local-validate only** (no full browser build) |
+| `baseline-windows.yml` | `workflow_dispatch` + `run_full_build` | full build on selected profile (default **self-hosted**) |
+| `baseline-windows-self-hosted.yml` | manual; type `READY` | full build on self-hosted labels |
 
 Do **not** start the self-hosted workflow until a compatible runner is online.
 
-## Recommended resource tiers (planning guidance — not hard requirements)
+Standard full build on `ubuntu-latest` requires typing `UNDERSTAND-OOM` — it is
+diagnostics-only after OOM confirmation on run `33862245103`.
 
-These are hypotheses until cgroup `memory.peak` / build success prove otherwise:
+## Resource guidance (planning — not hard requirements)
+
+Measured on standard public GHA (run `33862245103`):
 
 ```text
-16 GB:  likely marginal for gkrust Rust LTO
-32 GB:  first realistic trial
-64 GB:  preferred for future PGO/CSIR work
-128 GB+: relevant if future Full C/C++ LTO experiments are attempted
+MemTotal     ≈ 15.62 GiB
+SwapTotal    ≈ 3.0 GiB
+memory.peak  ≈ 14.56 GiB
+oom_kill     = 1 during gkrust -Clto
+```
+
+Therefore standard ~16 GiB is **insufficient**. Planning tiers until measured
+on self-hosted:
+
+```text
+32 GiB RAM:  first Phase 2 trial
+64 GiB RAM:  preferred for Phase 2 and future PGO/CSIR work
+128 GiB+:    future Full C/C++ LTO experiments only; not required for current Phase 2
 ```
 
 LibreWolf historically needed >128 GB for Windows **Full C/C++** LTO link
@@ -72,7 +93,7 @@ artifacts/disk/memory-before.txt / memory-after.txt
 ```
 
 Classify OOM as **CONFIRMED** only when cgroup `oom` / `oom_kill` (or equivalent)
-or kernel OOM evidence supports it — not from SIGKILL alone.
+supports it — not from SIGKILL alone. Run `33862245103` met that bar (`oom_kill=1`).
 
 ## Larger GitHub-hosted runners (optional)
 

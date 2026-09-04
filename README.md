@@ -10,7 +10,7 @@ This is **not** an official LibreWolf project. It wraps upstream LibreWolf `sour
 |-------|--------|
 | 0 Research | Done — see [docs/RESEARCH.md](docs/RESEARCH.md) |
 | 1 Plan | Done — see [docs/PLAN.md](docs/PLAN.md) |
-| 2 Upstream-equivalent Windows x64 baseline | **BLOCKED ON INFRASTRUCTURE** — see EVIDENCE.md / docs/SELF-HOSTED.md |
+| 2 Upstream-equivalent Windows x64 baseline | **BLOCKED WAITING FOR HIGH-MEMORY RUNNER** — standard GHA OOM CONFIRMED (`33862245103`); push runs validate-only |
 | 3+ Optimizations (v3, CSIR PGO, …) | Gated — see PLAN.md |
 
 ## Quick pins
@@ -20,5 +20,6 @@ See [`upstream/metadata.json`](upstream/metadata.json).
 ## License
 
 Upstream LibreWolf/Firefox code remains under MPL 2.0. Overlay scripts/docs in this repository are also intended to be MPL-2.0-compatible; see `LICENSE` when added.
+
 
 

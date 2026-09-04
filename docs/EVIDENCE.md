@@ -99,32 +99,15 @@ MOZ_TARGET=$ARCH-pc-mingw32  →  $ARCH-pc-windows-msvc
 - Upstream bsys6 `--enable-lto` **INACTIVE**
 - Upstream Firefox `gkrust` Rust LTO **ACTIVE** (expected via `rust.mk`, not overlay)
 
-**OOM status: STRONGLY SUSPECTED (not CONFIRMED)**
+**OOM status (at time of this run): STRONGLY SUSPECTED** — later **CONFIRMED** on instrumented run `33862245103` (see below). This run lacked cgroup `oom_kill` capture.
 
-- SIGKILL during multi-minute `gkrust` LTO on GHA-hosted runner is consistent with memory killer / cgroup OOM
-- Disk exhaustion disproved
-- This run did **not** capture readable cgroup `oom_kill` / kernel OOM lines (heartbeat lacked MemAvailable; `free` may be missing in image)
-- Next runs add `scripts/memory-report.sh` (meminfo, ulimit, cgroup v1/v2 `memory.current|peak|events`, best-effort dmesg)
-
-**Do not** disable upstream PGO or Rust gkrust LTO to greenwash GHA without explicit authorization.
-
-### Phase decision gate (33854319687)
+### Phase decision gate (33854319687) — superseded
 
 ```text
 RUN: 33854319687
-TARGET TRIPLE: PASS
-MOZBUILD: PASS
-CONFIGURE: PASS
-C/C++ COMPILE: PASS to observed point
-RUST COMPILE: PASS until gkrust final staticlib/LTO
-FIRST FAILING COMPONENT: gkrust
-FAILURE: rustc SIGKILL during -Clto, codegen-units=1
-DISK: NOT BLOCKER
-OOM: STRONGLY SUSPECTED
-UPSTREAM PGO: ACTIVE
-UPSTREAM RUST LTO: ACTIVE
-GITHUB-HOSTED BASELINE FEASIBILITY: UNLIKELY (pending authoritative cgroup evidence on a fresh instrumented run)
-RECOMMENDED INFRASTRUCTURE: collect cgroup memory.max/peak/oom_kill on standard public GHA (docs: 4CPU/16GB host VM); then self-hosted high-RAM (epsilon-class) or optional larger runners; keep upstream PGO + rust.mk LTO
+...
+OOM: STRONGLY SUSPECTED  →  superseded by CONFIRMED on 33862245103
+GITHUB-HOSTED BASELINE FEASIBILITY: UNLIKELY → INSUFFICIENT (confirmed later)
 PHASE 2: BLOCKED
 ```
 
@@ -146,39 +129,35 @@ Public-repo GitHub docs list `ubuntu-latest` as **4 CPU / 16 GB**; authoritative
 
 | Field | Value |
 |-------|-------|
-| Commit | `5ca1290` (docs + memory infra + reusable runner) |
+| Commit | `5ca1290` |
 | Duration | ~2334 s |
-| Result | `gkrust` rustc SIGKILL during `-Clto` |
-| MemTotal (visible) | 16377684 kB (~15.62 GiB) |
-| cgroup `memory.max` | `max` → summary `memory_limit_bytes: null` (no lower cgroup cap) |
-| cgroup `memory.peak` | 15628947456 (~14.56 GiB) |
+| Result | `gkrust` rustc SIGKILL during `-Clto` / `codegen-units=1` |
+| MemTotal | **16,377,684 kB (~15.62 GiB)** |
+| SwapTotal | **3,145,724 kB (~3.0 GiB)** |
+| cgroup | v2; `memory.max=max`, `memory.high=max` |
+| memory.peak | **15,628,947,456 bytes (~14.56 GiB)** |
+| Near failure | SwapFree ≈ 2 MiB; `oom_kill` flipped 0 → **1** |
 | cgroup `oom` | 0 |
-| cgroup `oom_kill` | **1** (was 0 at start) |
-| Upstream PGO | proven `true` (mozconfig) |
-| Upstream Rust LTO | proven `true` (build-log `-Clto`) |
+| cgroup `oom_kill` | **1** |
+| Disk | NOT BLOCKER |
+| Upstream PGO | proven `true` |
+| Upstream Rust LTO | proven `true` |
 | Overlay opts | all false |
 
-**OOM: CONFIRMED** via cgroup v2 `memory.events` `oom_kill=1` coincident with `gkrust` SIGKILL and peak RSS near host MemTotal. Kernel dmesg unreadable (`Operation not permitted`).
+**OOM = CONFIRMED** (direct cgroup evidence, not SIGKILL alone).
 
-Do **not** repeatedly retry standard GHA for this baseline after this confirmation.
+**STANDARD GITHUB-HOSTED BASELINE FEASIBILITY = INSUFFICIENT** for the current upstream-equivalent Windows build. Do not weaken upstream PGO / Rust LTO / `windows.profdata` / codegen-units to greenwash CI. Do not retry standard full builds except explicit diagnostics (`UNDERSTAND-OOM`).
 
 ```text
-STANDARD GHA:
-memory.max: max (null limit below host)
-memory.peak: 15628947456 (~14.56 GiB)
-oom: 0
-oom_kill: 1
-result: FAILURE (gkrust SIGKILL)
-
-SELF-HOSTED WORKFLOW:
-READY (workflow) / NOT READY (no registered runners)
-
-LARGER RUNNER:
-OPTIONAL / UNKNOWN for this personal public repo
-
-PHASE 2:
-BLOCKED ON INFRASTRUCTURE
+OOM: CONFIRMED
+STANDARD GHA FULL BUILD: MANUAL-ONLY (diagnostics; known OOM)
+SELF-HOSTED PHASE 2: workflow READY / runner NOT READY
+REQUIRED RUNNER LABELS: self-hosted, linux, x64, librewolf-builder
+RECOMMENDED RAM: 32 GiB first trial; 64 GiB preferred; 128 GiB+ Full LTO only
+PHASE 2: BLOCKED WAITING FOR HIGH-MEMORY RUNNER
+PHASE 3: BLOCKED
 ```
+
 
 
 

@@ -86,14 +86,33 @@ Smallest viable path:
 3. Build with `TARGET=windows ARCH=x86_64`
 4. Package zip (and optional portable later)
 5. Fail loudly on pin/checksum/config mismatch — no silent fallback
-6. Emit metadata: versions, disk samples, duration, artifact hashes
+6. Emit metadata: versions, disk samples, duration, artifact hashes, proven optimization layers
 
-Preferred CI host: `ubuntu-latest` with aggressive disk cleanup, using either:
+### Infrastructure (updated after OOM CONFIRMED)
 
-- official `codeberg.org/librewolf/bsys6:windows` container when Docker-in-GHA is viable, or
-- host bootstrap via `./bsys6 prepare` + `./bsys6 package` with the same pins
+**CONFIRMED:** standard public GitHub-hosted `ubuntu-latest` is **INSUFFICIENT** for the upstream-equivalent Windows build (run `33862245103`):
 
-If GitHub-hosted resources cannot complete the build, stop and document the limiting resource. Self-hosted remains optional and is a human gate to require.
+```text
+MemTotal ≈ 15.62 GiB, SwapTotal ≈ 3.0 GiB
+memory.peak ≈ 14.56 GiB, oom_kill = 1 during gkrust -Clto
+```
+
+Policy:
+
+- Push/PR: **local-validate only** (no automatic full browser build)
+- Full Phase 2 package: **self-hosted** high-memory runner (labels `self-hosted,linux,x64,librewolf-builder`) via reusable workflow
+- Standard full build: **manual diagnostics only** (`UNDERSTAND-OOM`); do not retry to “make CI green”
+- Do **not** disable upstream PGO / Rust gkrust LTO / `windows.profdata` / codegen-units
+
+Resource guidance (hypotheses until measured on self-hosted):
+
+```text
+32 GiB RAM: first Phase 2 trial
+64 GiB RAM: preferred for Phase 2 and future PGO/CSIR
+128 GiB+:   future Full C/C++ LTO only; not required for current Phase 2
+```
+
+See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`.
 
 ## Phase 3 requirements (amended — implement only after probe)
 
@@ -143,7 +162,8 @@ Ranked for Phase 2 completion while preserving upstream PGO + Firefox Rust gkrus
 | 4 | **C/D. External / container swap** | High fidelity of flags; slower | Low | Medium (swap availability varies) | Low | Marginal help for peak RSS |
 | 5 | **F. Reusable prebuilt upstream artifacts** | Lower for *our* compile proof | Low | Medium | Medium | Poor — skips the build we must validate |
 
-GHA standard `ubuntu-latest` (public docs: 4 CPU / 16 GB host VM) remains **unproven** for finishing `gkrust` fat Rust LTO inside the bsys6 container until cgroup evidence is collected; do not weaken baseline flags before trying higher-memory runners.
+GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`, MemTotal ~15.62 GiB, peak ~14.56 GiB, `oom_kill=1`). Prefer self-hosted ≥32 GiB (64 GiB preferred); do not weaken baseline flags.
+
 
 ## Phase 4–5 gates (not authorized yet)
 
@@ -204,4 +224,5 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 

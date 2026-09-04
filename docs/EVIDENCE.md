@@ -49,3 +49,31 @@ MOZ_TARGET=$ARCH-pc-mingw32  →  $ARCH-pc-windows-msvc
 
 **Fix applied:** set `HOME=/root`, `MOZBUILD=/root/.mozbuild` for the build job (and mirror in `build-windows-baseline.sh` when the image SDK exists).
 
+## GHA run 33757327905 (FAILED — runner lost communication)
+
+**CONFIRMED (annotation):**
+
+> The hosted runner lost communication with the server. Anything in your workflow that terminates the runner process, starves it for CPU/Memory, or blocks its network access can cause this error.
+
+| Field | Value |
+|-------|-------|
+| Job start | 2026-09-03T12:50:13Z |
+| Job end | 2026-09-03T13:53:29Z (~63m) |
+| Build step start | 2026-09-03T12:54:07Z |
+| Build step end | never completed (`completed_at: null`, stayed `in_progress`) |
+| Build logs | Azure `BlobNotFound` — not retrievable |
+| Build artifacts | none (upload step never ran) |
+
+**CONFIRMED:** `local-validate` PASS.
+
+**CONFIRMED:** previous mingw32 configure failure is **not** this failure mode (job lasted ~1h into build).
+
+**INFERRED:** `x86_64-pc-windows-msvc` + WinSDK path were OK enough to pass configure (contrast run 33756336955 SDK death at ~1.5m).
+
+**INFERRED root cause:** GitHub-hosted runner resource starvation (memory/CPU) during compile killed/disconnected the agent.
+
+**DISK:** unknown as sole cause; GitHub message points primarily at CPU/Memory.
+
+**Minimal repair for next run:** `MOZ_MAKE_FLAGS=-j2`, optional swap, toolchain probe, stdout/file heartbeats, tee mach logs, split `bsys6 source` then inject parallelism into mozconfig before `build package`.
+
+

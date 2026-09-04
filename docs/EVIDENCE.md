@@ -148,15 +148,40 @@ Public-repo GitHub docs list `ubuntu-latest` as **4 CPU / 16 GB**; authoritative
 
 **STANDARD GITHUB-HOSTED BASELINE FEASIBILITY = INSUFFICIENT** for the current upstream-equivalent Windows build. Do not weaken upstream PGO / Rust LTO / `windows.profdata` / codegen-units to greenwash CI. Do not retry standard full builds except explicit diagnostics (`UNDERSTAND-OOM`).
 
+## GHA run 33895224558 (SUCCESS — Phase 2 self-hosted)
+
+| Field | Value |
+|-------|-------|
+| Commit | `61d3c2c` |
+| Runner | `librewolf-builder-wsl` (labels: self-hosted, Linux, X64, librewolf-builder) |
+| Host MemTotal | 32,646,784 kB (~31.13 GiB) |
+| Host SwapTotal | 8,388,608 kB (~8.0 GiB) |
+| Duration | 9610 s (~2 h 40 m) |
+| Target | `x86_64-pc-windows-msvc` |
+| Artifact | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| Size | 158,771,036 bytes (~151.4 MiB) |
+| SHA-256 | `455886377761ae45f4bcc250021ce9a20858eb1811d3a99936e4bf076829c054` |
+| Package check | zip OK; contains `librewolf/librewolf.exe`, `xul.dll`, 53 entries |
+| memory.peak | 30,488,612,864 bytes (~28.39 GiB) |
+| Peak swap used | ~2,100,432 kB (~2.00 GiB) from samples (`SwapTotal−SwapFree` max) |
+| oom / oom_kill | **0 / 0** (did not increase) |
+| clang | 21.1.8 (taskcluster) |
+| rustc | 1.97.1 |
+| LibreWolf / Firefox | 155.0-1 / 155.0 |
+| bsys6 | `24c40ffaa25b558e4c5ce9f326bc4466ba7608bc` |
+| source | `03ba053934d5f6c7a11cb472424017caafd607e9` |
+| Upstream PGO | **true** (`--enable-profile-use` in configure/mozconfig) |
+| Upstream C/C++ LTO | **false** (no `--enable-lto`) |
+| Upstream Rust gkrust LTO | **active** (Firefox `rust.mk` default; `Compiling gkrust` succeeded; prior OOM run showed rustc `-Clto`) |
+| Overlay opts | all false |
+
 ```text
-OOM: CONFIRMED
-STANDARD GHA FULL BUILD: MANUAL-ONLY (diagnostics; known OOM)
-SELF-HOSTED PHASE 2: workflow READY / runner NOT READY
-REQUIRED RUNNER LABELS: self-hosted, linux, x64, librewolf-builder
-RECOMMENDED RAM: 32 GiB first trial; 64 GiB preferred; 128 GiB+ Full LTO only
-PHASE 2: BLOCKED WAITING FOR HIGH-MEMORY RUNNER
-PHASE 3: BLOCKED
+PHASE 2: PASS
+PHASE 3: BLOCKED — awaiting human authorization
 ```
+
+Measured on this one successful self-hosted run (~31 GiB RAM host). Do **not** treat 32 GiB / 64 GiB as a universal hard requirement from a single data point.
+
 
 
 

@@ -72,7 +72,7 @@ Mozilla Firefox → LibreWolf source → bsys6 → our overlay → Windows x64 a
 |-------|---------|---------------|
 | 0 | RESEARCH.md | Done / authorized |
 | 1 | PLAN.md | Done / authorized |
-| 2 | Upstream-equivalent Windows x64 CI | **Authorized now** |
+| 2 | Upstream-equivalent Windows x64 CI | **PASS** (self-hosted run `33895224558`) |
 | 3 | x86-64-v3 separate config | Authorized only after PLAN amendments below + Rust probe |
 | 4–5 | CSIR PGO + CI topology | **Not authorized** until CSIR PoC evidence |
 | 6+ | Workload / privacy / bench / update automation | Not authorized yet |
@@ -224,5 +224,6 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 
 

@@ -33,6 +33,10 @@ jobs:
     container:
       image: codeberg.org/librewolf/bsys6:windows
       options: --user root
+    # Container /bin/sh is dash; [[ requires Bash (run 33862245103: [[: not found).
+    defaults:
+      run:
+        shell: bash
     env:
       TARGET: windows
       ARCH: x86_64

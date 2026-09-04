@@ -27,7 +27,7 @@ jobs:
         env:
           CONFIRM: ${{ inputs.confirm_runner_ready }}
         run: |
-          if [[ "$CONFIRM" != "READY" ]]; then
+          if [ "$CONFIRM" != "READY" ]; then
             echo "Refusing to start: confirm_runner_ready must be READY" >&2
             echo "Register a runner with labels: self-hosted linux x64 librewolf-builder" >&2
             echo "Recommended RAM: 32 GiB first trial / 64 GiB preferred (see docs/SELF-HOSTED.md)" >&2

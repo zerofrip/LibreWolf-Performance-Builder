@@ -117,6 +117,9 @@ chmod +x "$WRAPPER" "$RUST_WRAPPER" \
 
 WRAP_BIN="${ROOT}/artifacts/logs/wrap-bin"
 mkdir -p "$WRAP_BIN"
+REAL_CLANG_CL="${REAL_CLANG%/*}/clang-cl"
+[[ -x "$REAL_CLANG_CL" ]] || { echo "ERROR: clang-cl not found at $REAL_CLANG_CL" >&2; exit 1; }
+
 cat >"${WRAP_BIN}/clang" <<EOF
 #!/usr/bin/env bash
 export LWPB_WRAPPER_KIND=clang
@@ -131,10 +134,20 @@ export LWPB_REAL_COMPILER="${REAL_CLANGXX}"
 export LWPB_COMPILER_LOG="${LWPB_COMPILER_LOG}"
 exec "${WRAPPER}" "\$@"
 EOF
-chmod +x "${WRAP_BIN}/clang" "${WRAP_BIN}/clang++"
-# Prepend wrap-bin so configure resolves basename "clang"
+cat >"${WRAP_BIN}/clang-cl" <<EOF
+#!/usr/bin/env bash
+export LWPB_WRAPPER_KIND=clang-cl
+export LWPB_REAL_COMPILER="${REAL_CLANG_CL}"
+export LWPB_COMPILER_LOG="${LWPB_COMPILER_LOG}"
+exec "${WRAPPER}" "\$@"
+EOF
+chmod +x "${WRAP_BIN}/clang" "${WRAP_BIN}/clang++" "${WRAP_BIN}/clang-cl"
 export PATH="${WRAP_BIN}:${PATH}"
-unset CC CXX || true
+# Force configure to use wrappers (mozbuild absolute paths otherwise bypass PATH)
+export CC="${WRAP_BIN}/clang-cl"
+export CXX="${WRAP_BIN}/clang-cl"
+export HOST_CC="${WRAP_BIN}/clang"
+export HOST_CXX="${WRAP_BIN}/clang++"
 export RUSTC_WRAPPER="$RUST_WRAPPER"
 
 "${ROOT}/scripts/probe-toolchain.sh" "${ROOT}/artifacts/toolchain-probe.txt"
@@ -249,3 +262,4 @@ TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 STATUS="ok"
 echo "Phase 3 x86-64-v3 package complete: $ARTIFACT"
+

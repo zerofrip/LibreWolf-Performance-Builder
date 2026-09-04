@@ -60,8 +60,8 @@ cp "$TMP/obj/config/autoconf.mk" \
   "$FAKE_WORK/librewolf-${LWPB_FULL_VERSION}/obj-x86_64-pc-windows-msvc/config/autoconf.mk"
 
 cat >"$TMP/inv.jsonl" <<'EOF'
-{"ts":"2026-01-01T00:00:00Z","kind":"clang","argv":["clang","--target=x86_64-pc-windows-msvc","-march=x86-64-v3","-c","a.c"]}
-{"ts":"2026-01-01T00:00:01Z","kind":"clangxx","argv":["clang++","--target=x86_64-pc-windows-msvc","-march=x86-64-v3","-c","a.cpp"]}
+{"ts":"2026-01-01T00:00:00Z","kind":"clang-cl","argv":["clang-cl","-march=x86-64-v3","-c","a.c"]}
+{"ts":"2026-01-01T00:00:01Z","kind":"clang-cl","argv":["clang-cl","-TP","-march=x86-64-v3","-c","a.cpp"]}
 {"ts":"2026-01-01T00:00:02Z","kind":"rustc","argv":["rustc","--target","x86_64-pc-windows-msvc","-C","target-cpu=x86-64-v3","lib.rs"]}
 EOF
 
@@ -111,3 +111,4 @@ fi
 
 echo
 echo "Phase 3 local validation PASSED (full Windows compile not run)."
+

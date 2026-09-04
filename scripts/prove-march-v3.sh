@@ -55,121 +55,18 @@ host_c_leak=false
 host_rust_leak=false
 
 if [[ -f "$COMPILER_LOG" ]]; then
-  # TARGET C: windows-msvc target + -march=x86-64-v3
-  if python3 - "$COMPILER_LOG" <<'PY'
-import json,sys
-path=sys.argv[1]
-ok=False
-for line in open(path):
-    line=line.strip()
-    if not line: continue
-    try: o=json.loads(line)
-    except Exception: continue
-    argv=" ".join(o.get("argv") or [])
-    kind=o.get("kind","")
-    if kind not in ("clang","cc",""): 
-        # also accept unknown if looks like clang
-        pass
-    is_win = ("x86_64-pc-windows-msvc" in argv) or ("x86_64-windows-msvc" in argv) or ("--target=x86_64-pc-windows-msvc" in argv)
-    has_v3 = "-march=x86-64-v3" in argv
-    is_host = ("x86_64-unknown-linux" in argv) or ("x86_64-pc-linux" in argv)
-    if is_win and has_v3 and kind in ("clang","cc","unknown"):
-        ok=True
-    if kind in ("clang","cc") and has_v3 and is_host and not is_win:
-        # host leak with march — still note via separate check below
-        pass
-if not ok:
-    # also: kind clang with march and windows in any form
-    for line in open(path):
-        line=line.strip()
-        if not line: continue
-        try: o=json.loads(line)
-        except Exception: continue
-        argv=" ".join(o.get("argv") or [])
-        if o.get("kind") in ("clang","cc") and "-march=x86-64-v3" in argv and ("windows-msvc" in argv or "windows-msvc" in argv.replace("_","-")):
-            ok=True
-            break
-sys.exit(0 if ok else 1)
-PY
-  then c_target_inv=true; fi
-
-  if python3 - "$COMPILER_LOG" <<'PY'
-import json,sys
-path=sys.argv[1]
-ok=False
-for line in open(path):
-    line=line.strip()
-    if not line: continue
-    try: o=json.loads(line)
-    except Exception: continue
-    if o.get("kind") not in ("clangxx","cxx"): continue
-    argv=" ".join(o.get("argv") or [])
-    if "-march=x86-64-v3" in argv and ("windows-msvc" in argv):
-        ok=True
-        break
-sys.exit(0 if ok else 1)
-PY
-  then cxx_target_inv=true; fi
-
-  if python3 - "$COMPILER_LOG" <<'PY'
-import json,sys
-path=sys.argv[1]
-ok=False
-for line in open(path):
-    line=line.strip()
-    if not line: continue
-    try: o=json.loads(line)
-    except Exception: continue
-    if o.get("kind") != "rustc": continue
-    argv=" ".join(o.get("argv") or [])
-    if "target-cpu=x86-64-v3" in argv and "x86_64-pc-windows-msvc" in argv:
-        ok=True
-        break
-sys.exit(0 if ok else 1)
-PY
-  then rust_target_inv=true; fi
-
-  # Host leakage: -march=x86-64-v3 without a Windows target
-  if python3 - "$COMPILER_LOG" <<'PY'
-import json,sys
-path=sys.argv[1]
-leak=False
-for line in open(path):
-    line=line.strip()
-    if not line: continue
-    try: o=json.loads(line)
-    except Exception: continue
-    if o.get("kind") not in ("clang","cc","clangxx","cxx"): continue
-    argv=" ".join(o.get("argv") or [])
-    if "-march=x86-64-v3" not in argv: continue
-    if "windows-msvc" not in argv:
-        leak=True
-        break
-sys.exit(0 if leak else 1)
-PY
-  then host_c_leak=true; fi
-
-  if python3 - "$COMPILER_LOG" <<'PY'
-import json,sys
-path=sys.argv[1]
-leak=False
-for line in open(path):
-    line=line.strip()
-    if not line: continue
-    try: o=json.loads(line)
-    except Exception: continue
-    if o.get("kind") != "rustc": continue
-    argv=o.get("argv") or []
-    joined=" ".join(argv)
-    if "target-cpu=x86-64-v3" not in joined: continue
-    # host rustc typically uses linux gnu target or no --target (defaults host)
-    has_win=any("x86_64-pc-windows-msvc" in a for a in argv)
-    if not has_win:
-        leak=True
-        break
-sys.exit(0 if leak else 1)
-PY
-  then host_rust_leak=true; fi
+  INV_JSON="$(python3 "${ROOT}/scripts/analyze-compiler-invocations.py" "$COMPILER_LOG")"
+  c_target_inv="$(jq -r '.c_target' <<<"$INV_JSON")"
+  cxx_target_inv="$(jq -r '.cxx_target' <<<"$INV_JSON")"
+  rust_target_inv="$(jq -r '.rust_target' <<<"$INV_JSON")"
+  host_c_leak="$(jq -r '.host_c_march_leak' <<<"$INV_JSON")"
+  host_rust_leak="$(jq -r '.host_rust_target_cpu_leak' <<<"$INV_JSON")"
+  # normalize to bash true/false
+  [[ "$c_target_inv" == true ]] && c_target_inv=true || c_target_inv=false
+  [[ "$cxx_target_inv" == true ]] && cxx_target_inv=true || cxx_target_inv=false
+  [[ "$rust_target_inv" == true ]] && rust_target_inv=true || rust_target_inv=false
+  [[ "$host_c_leak" == true ]] && host_c_leak=true || host_c_leak=false
+  [[ "$host_rust_leak" == true ]] && host_rust_leak=true || host_rust_leak=false
 fi
 
 # Fallback: build log greps (mach sometimes echoes commands)
@@ -277,3 +174,4 @@ if [[ "$overall" != true ]]; then
   exit 1
 fi
 echo "PROVE_MARCH_V3=PASS"
+

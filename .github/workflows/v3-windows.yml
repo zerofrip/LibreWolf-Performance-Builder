@@ -1,0 +1,61 @@
+name: Windows x86-64-v3 (self-hosted manual)
+
+# Phase 3: CPU baseline specialization only.
+# Requires runner labels: self-hosted, linux, x64, librewolf-builder
+# Does NOT enable ThinLTO, CSIR, custom toolchains, or benchmarks.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_runner_ready:
+        description: "Type READY if a compatible self-hosted runner is online"
+        required: true
+        type: string
+        default: ""
+
+concurrency:
+  group: v3-windows-self-hosted
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require READY confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm_runner_ready }}
+        run: |
+          if [ "$CONFIRM" != "READY" ]; then
+            echo "Refusing to start: confirm_runner_ready must be READY" >&2
+            exit 1
+          fi
+
+  local-validate-v3:
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install jq and git-lfs
+        run: sudo apt-get update && sudo apt-get install -y jq git-lfs
+      - name: Phase 3 local validation
+        run: bash scripts/local-validate-v3.sh
+      - name: Upload validation artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-local-validate
+          path: |
+            artifacts/
+            work/*.source.tar.gz.sha256
+          if-no-files-found: warn
+          retention-days: 7
+
+  build-windows-v3:
+    needs: [guard, local-validate-v3]
+    uses: ./.github/workflows/v3-windows-reusable.yml
+    with:
+      runner_profile: self-hosted
+      runs_on_json: '["self-hosted","linux","x64","librewolf-builder"]'
+      moz_make_flags: "-j2"
+      try_swap: "1"

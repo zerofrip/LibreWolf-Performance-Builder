@@ -1,0 +1,135 @@
+# Reusable Phase 3 Windows x86-64-v3 build.
+# Same pins/toolchain/PGO/Rust-LTO semantics as Phase 2, plus CPU baseline overlay.
+
+name: Reusable V3 Windows Build
+
+on:
+  workflow_call:
+    inputs:
+      runner_profile:
+        description: "Must be self-hosted for Phase 3 full builds"
+        required: true
+        type: string
+      runs_on_json:
+        description: 'JSON runs-on value'
+        required: true
+        type: string
+      moz_make_flags:
+        required: false
+        type: string
+        default: "-j2"
+      try_swap:
+        required: false
+        type: string
+        default: "1"
+
+jobs:
+  build-windows-v3:
+    runs-on: ${{ fromJSON(inputs.runs_on_json) }}
+    timeout-minutes: 720
+    container:
+      image: codeberg.org/librewolf/bsys6:windows
+      options: --user root
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: windows
+      ARCH: x86_64
+      LTO: ""
+      MOZ_PGO: ""
+      HOME: /root
+      MOZBUILD: /root/.mozbuild
+      MOZBUILD_STATE_PATH: /root/.mozbuild
+      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      LWPB_RUNNER_PROFILE: ${{ inputs.runner_profile }}
+      LWPB_BUILD_PHASE: 3-x86-64-v3
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v4
+
+      - name: Disk before
+        run: bash scripts/disk-report.sh gha-before
+
+      - name: Install git/curl/jq/git-lfs/procps if missing
+        run: |
+          apt-get update
+          apt-get install -y jq git curl ca-certificates git-lfs procps unzip
+          git lfs install
+
+      - name: Cache pinned source tarball
+        uses: actions/cache@v4
+        with:
+          path: work/librewolf-155.0-1.source.tar.gz
+          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
+
+      - name: Verify Phase 3 config + privacy invariants
+        run: |
+          bash scripts/verify-v3-config.sh
+          bash scripts/check-privacy-invariants.sh
+          bash scripts/verify-baseline-config.sh
+
+      - name: Probe Clang / Rust x86-64-v3 (mandatory gate)
+        run: |
+          bash scripts/probe-clang-v3.sh artifacts/probes
+          bash scripts/probe-rust-v3.sh artifacts/probes
+          jq -e '.direct_target_cpu_supported == true' artifacts/probes/rust-v3-probe.json
+
+      - name: Probe image toolchain paths
+        run: bash scripts/probe-toolchain.sh artifacts/toolchain-probe-pre.txt
+
+      - name: Memory report before build
+        run: bash scripts/memory-report.sh full memory-pre-build
+
+      - name: Build Phase 3 Windows x86-64-v3 package
+        env:
+          MOZ_MAKE_FLAGS: ${{ inputs.moz_make_flags }}
+          LWPB_TRY_SWAP: ${{ inputs.try_swap }}
+        run: bash scripts/build-windows-v3.sh
+
+      - name: Disk after
+        if: always()
+        run: bash scripts/disk-report.sh gha-after
+
+      - name: Memory summary after build
+        if: always()
+        run: |
+          bash scripts/memory-report.sh full memory-post-build || true
+          bash scripts/memory-report.sh summary || true
+          if [[ -f artifacts/memory-summary.json ]]; then
+            cat artifacts/memory-summary.json
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v3-windows-x64-${{ inputs.runner_profile }}
+          path: |
+            out/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail unless Phase 3 metadata + v3 proof are green
+        run: |
+          set -euo pipefail
+          test -f artifacts/v3-windows-metadata.json
+          test -f artifacts/v3-proof.json
+          jq -e '.status == "ok"' artifacts/v3-windows-metadata.json
+          jq -e '.moz_target == "x86_64-pc-windows-msvc"' artifacts/v3-windows-metadata.json
+          jq -e '.phase == "3-x86-64-v3"' artifacts/v3-windows-metadata.json
+          jq -e '
+            .optimizations.overlay_lto == false
+            and .optimizations.csir == false
+            and .optimizations.x86_64_v3 == true
+            and .optimizations.upstream_pgo == true
+            and .optimizations.proven.c_x86_64_v3 == true
+            and .optimizations.proven.cpp_x86_64_v3 == true
+            and .optimizations.proven.rust_x86_64_v3 == true
+            and .optimizations.proven.host_target_separation == true
+          ' artifacts/v3-windows-metadata.json
+          jq -e '.x86_64_v3 == true' artifacts/v3-proof.json
+          if [[ -f artifacts/memory-summary.json ]]; then
+            jq -e '.oom_kill_count == 0 or .oom_kill_count == null' artifacts/memory-summary.json
+          fi

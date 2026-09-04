@@ -11,7 +11,7 @@ handling, metadata, and artifacts stay identical via
 |------|--------|
 | Reusable full-build workflow | Ready |
 | Manual self-hosted wrapper | Ready (`baseline-windows-self-hosted.yml`) |
-| Registered runner with required labels | **Not ready** until an operator registers one |
+| Registered runner with required labels | **Proven** — `librewolf-builder-wsl` completed Phase 2 run `33895224558` |
 | Standard GitHub-hosted full build | **Insufficient** (OOM CONFIRMED, run `33862245103`) — not used on push |
 
 ## Labels
@@ -103,3 +103,4 @@ use `workflow_dispatch` → `runner_profile=larger-custom` and set
 
 Personal public repositories often **cannot** access larger runners.
 Do not assume availability for this repo.
+

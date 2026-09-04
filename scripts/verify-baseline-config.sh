@@ -24,4 +24,7 @@ for v in "${FORBIDDEN_ENV[@]}"; do
   fi
 done
 
-echo "Baseline config OK (no optimization overlays, no LTO/PGO env)."
+echo "Baseline config OK (no OUR optimization overlays; env LTO/MOZ_PGO* unset)."
+echo "Note: upstream mozconfig may still get --enable-profile-use from bsys6 assets/*.profdata;"
+echo "      Firefox rust.mk may still pass -Clto for gkrust. Those are upstream-equivalent."
+

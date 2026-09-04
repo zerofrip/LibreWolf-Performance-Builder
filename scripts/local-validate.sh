@@ -39,8 +39,35 @@ test -f "work/librewolf-${LWPB_FULL_VERSION}.source.tar.gz"
 echo "== metadata writer smoke =="
 mkdir -p artifacts
 scripts/write-build-metadata.sh artifacts/local-validate-metadata.json ok 0 ""
-jq -e '.optimizations.lto == false and .optimizations.x86_64_v3 == false and .optimizations.csir == false' artifacts/local-validate-metadata.json >/dev/null
+jq -e '
+  .optimizations.overlay_lto == false
+  and .optimizations.overlay_pgo == false
+  and .optimizations.overlay_optimizations == false
+  and .optimizations.x86_64_v3 == false
+  and .optimizations.csir == false
+  and (.optimizations | has("upstream_rust_lto"))
+  and (.optimizations | has("upstream_pgo"))
+  and (.optimizations | has("upstream_cpp_lto"))
+' artifacts/local-validate-metadata.json >/dev/null
 
+echo "== memory-report smoke =="
+MEMORY_REPORT_DIR="${ROOT}/artifacts/disk" scripts/memory-report.sh sample >/dev/null
+MEMORY_REPORT_DIR="${ROOT}/artifacts/disk" scripts/memory-report.sh summary >/dev/null
+test -f artifacts/memory-summary.json
+jq -e 'has("memory_limit_bytes") and has("oom_kill_count")' artifacts/memory-summary.json >/dev/null
+echo "OK memory-summary.json"
+
+echo "== detect-optimization-state smoke =="
+# Synthetic mozconfig: upstream PGO on, C++ LTO off
+TMPM="$(mktemp)"
+cat >"$TMPM" <<'EOF'
+ac_add_options --enable-profile-use
+ac_add_options --with-pgo-profile-path=/tmp/windows.profdata
+EOF
+scripts/detect-optimization-state.sh "$TMPM" /dev/null \
+  | jq -e '.upstream_pgo == true and .upstream_cpp_lto == false and .overlay_lto == false'
+rm -f "$TMPM"
+echo "OK detect-optimization-state"
 echo "== windows target guard =="
 TARGET=windows ARCH=x86_64 scripts/verify-windows-target.sh
 # Negative test: temporarily point at a fake mingw emitter if we had one — instead
@@ -59,4 +86,5 @@ scripts/disk-report.sh local-validate
 echo
 echo "Local validation PASSED (full Windows compile not run)."
 echo "Next: GitHub Actions workflow baseline-windows.yml"
+
 

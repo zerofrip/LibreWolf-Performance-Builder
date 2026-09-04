@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Write machine-readable build metadata after a baseline attempt.
+# Optimization flags are proven from mozconfig/build log when available.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,6 +11,8 @@ OUT="${1:?usage: write-build-metadata.sh <outfile.json>}"
 STATUS="${2:?status required}"
 DURATION_SEC="${3:-}"
 ARTIFACT="${4:-}"
+MOZCONFIG="${5:-}"
+BUILD_LOG="${6:-${ROOT}/artifacts/logs/bsys6-build-package.log}"
 
 mkdir -p "$(dirname "$OUT")"
 
@@ -38,6 +41,22 @@ if [[ -x "${HOME}/.mozbuild/clang/bin/clang" ]]; then
   LLVM_VER="$("${HOME}/.mozbuild/clang/bin/clang" --version 2>/dev/null | head -1 || true)"
 fi
 
+# Auto-locate mozconfig if not passed
+if [[ -z "$MOZCONFIG" || ! -f "$MOZCONFIG" ]]; then
+  if [[ -n "${WORKDIR:-}" ]]; then
+    cand="${WORKDIR}/librewolf-${LWPB_FULL_VERSION}/mozconfig"
+    [[ -f "$cand" ]] && MOZCONFIG="$cand"
+  fi
+fi
+if [[ -z "$MOZCONFIG" || ! -f "$MOZCONFIG" ]]; then
+  cand="$(find "${ROOT}/work" -maxdepth 3 -type f -name mozconfig 2>/dev/null | head -1 || true)"
+  [[ -n "$cand" ]] && MOZCONFIG="$cand"
+fi
+
+OPT_JSON="$("${ROOT}/scripts/detect-optimization-state.sh" "${MOZCONFIG:-}" "${BUILD_LOG:-}")"
+
+RUNNER_PROFILE="${LWPB_RUNNER_PROFILE:-unknown}"
+
 jq -n \
   --arg status "$STATUS" \
   --arg phase "2-baseline" \
@@ -53,6 +72,7 @@ jq -n \
   --arg host_os "$HOST_OS" \
   --arg host_arch "$HOST_ARCH" \
   --arg runner "$RUNNER" \
+  --arg runner_profile "$RUNNER_PROFILE" \
   --arg llvm "$LLVM_VER" \
   --arg rust "$RUST_VER" \
   --arg duration_sec "$DURATION_SEC" \
@@ -60,7 +80,7 @@ jq -n \
   --arg artifact_sha256 "$ARTIFACT_SHA" \
   --arg artifact_size "$ARTIFACT_SIZE" \
   --arg ts "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
-  --argjson optimizations '{"lto":false,"pgo":"upstream-if-profdata","x86_64_v3":false,"csir":false,"overlay_optimizations":false}' \
+  --argjson optimizations "$OPT_JSON" \
   '{
     status: $status,
     phase: $phase,
@@ -76,6 +96,7 @@ jq -n \
     host_os: $host_os,
     host_arch: $host_arch,
     runner: $runner,
+    runner_profile: $runner_profile,
     llvm_version: $llvm,
     rust_version: $rust,
     duration_sec: $duration_sec,
@@ -88,4 +109,3 @@ jq -n \
 
 echo "Wrote metadata $OUT"
 cat "$OUT"
-

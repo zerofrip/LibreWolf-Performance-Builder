@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Phase 2: upstream-equivalent Windows x64 LibreWolf build via pinned bsys6.
-# No LTO / PGO / x86-64-v3 overlays. Fail loudly on mismatches.
+# No OUR optimization overlays (v3 / CSIR / overlay LTO). Upstream may still
+# enable profile-use (windows.profdata) and Firefox default gkrust -Clto.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -27,13 +28,22 @@ stop_heartbeat() {
 cleanup_meta() {
   local end duration
   stop_heartbeat
+  # Post-failure / post-success memory + cgroup snapshot (best-effort).
+  bash "${ROOT}/scripts/memory-report.sh" full memory-after || true
+  bash "${ROOT}/scripts/memory-report.sh" summary || true
   end="$(date +%s)"
   duration="$((end - START_TS))"
+  local mozconfig=""
+  if [[ -n "${WORKDIR:-}" ]]; then
+    mozconfig="${WORKDIR}/librewolf-${LWPB_FULL_VERSION:-}/mozconfig"
+  fi
   "${ROOT}/scripts/write-build-metadata.sh" \
     "${ROOT}/artifacts/baseline-windows-metadata.json" \
     "$STATUS" \
     "$duration" \
-    "$ARTIFACT" || true
+    "$ARTIFACT" \
+    "${mozconfig}" \
+    "${ROOT}/artifacts/logs/bsys6-build-package.log" || true
 }
 trap cleanup_meta EXIT
 
@@ -167,3 +177,4 @@ TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 STATUS="ok"
 echo "Phase 2 baseline package complete: $ARTIFACT"
+

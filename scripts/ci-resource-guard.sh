@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CI resource guard for GitHub-hosted Firefox/LibreWolf builds.
+# CI resource guard for Firefox/LibreWolf builds.
 # Goal: reduce OOM / runner-loss risk — not an optimization overlay.
 set -euo pipefail
 
@@ -28,14 +28,17 @@ if [[ "${LWPB_TRY_SWAP:-1}" == "1" ]]; then
   fi
 fi
 
-# Periodic heartbeat to stdout + artifacts (helps diagnose runner-loss).
+# Baseline memory snapshot (MemTotal / cgroup limits / events).
+bash "${ROOT}/scripts/memory-report.sh" full memory-before || true
+
+# Periodic concise heartbeat (JSONL/TSV + one-liner). Not a full dump.
 heartbeat() {
   local n=0
   while true; do
     n=$((n + 1))
     {
       echo "=== heartbeat n=${n} ts=$(date -u +%Y-%m-%dT%H:%M:%SZ) ==="
-      free -h 2>/dev/null || true
+      bash "${ROOT}/scripts/memory-report.sh" sample || true
       df -h / /__w 2>/dev/null || df -h . 2>/dev/null || true
       if [[ -n "${WORKDIR:-}" && -d "${WORKDIR}" ]]; then
         du -sh "${WORKDIR}" 2>/dev/null || true

@@ -104,15 +104,17 @@ Policy:
 - Standard full build: **manual diagnostics only** (`UNDERSTAND-OOM`); do not retry to “make CI green”
 - Do **not** disable upstream PGO / Rust gkrust LTO / `windows.profdata` / codegen-units
 
-Resource guidance (hypotheses until measured on self-hosted):
+Resource guidance (updated after measured self-hosted PASS `33895224558`):
 
 ```text
-32 GiB RAM: first Phase 2 trial
-64 GiB RAM: preferred for Phase 2 and future PGO/CSIR
+~31 GiB RAM + 8 GiB swap: proven once (peak ≈28.39 GiB; not a universal minimum)
+64 GiB RAM: preferred headroom for Phase 2 / future PGO/CSIR
 128 GiB+:   future Full C/C++ LTO only; not required for current Phase 2
 ```
 
-See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`.
+See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3 remains **BLOCKED** until explicit human authorization.
+
+GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`). Prefer self-hosted with measured headroom; do not weaken baseline flags.
 
 ## Phase 3 requirements (amended — implement only after probe)
 
@@ -162,7 +164,7 @@ Ranked for Phase 2 completion while preserving upstream PGO + Firefox Rust gkrus
 | 4 | **C/D. External / container swap** | High fidelity of flags; slower | Low | Medium (swap availability varies) | Low | Marginal help for peak RSS |
 | 5 | **F. Reusable prebuilt upstream artifacts** | Lower for *our* compile proof | Low | Medium | Medium | Poor — skips the build we must validate |
 
-GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`, MemTotal ~15.62 GiB, peak ~14.56 GiB, `oom_kill=1`). Prefer self-hosted ≥32 GiB (64 GiB preferred); do not weaken baseline flags.
+GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`, MemTotal ~15.62 GiB, peak ~14.56 GiB, `oom_kill=1`). Prefer measured self-hosted capacity (run `33895224558` succeeded at ~31 GiB / peak ~28.39 GiB); do not weaken baseline flags.
 
 
 ## Phase 4–5 gates (not authorized yet)
@@ -224,6 +226,7 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 
 
 

@@ -33,7 +33,7 @@ Do **not** hard-code a machine hostname in workflows.
 Linux x86_64
 Docker (required — the job uses container: codeberg.org/librewolf/bsys6:windows)
 GitHub Actions runner application
-Sufficient RAM (see tiers below — hypotheses until measured)
+Sufficient RAM (see measured Phase 2 profile + planning tiers below)
 Sufficient disk (tens of GB free for objdir + source; prefer ≥100 GB free)
 Network access to:
   - github.com / api.github.com / Actions endpoints
@@ -59,7 +59,7 @@ Do **not** start the self-hosted workflow until a compatible runner is online.
 Standard full build on `ubuntu-latest` requires typing `UNDERSTAND-OOM` — it is
 diagnostics-only after OOM confirmation on run `33862245103`.
 
-## Resource guidance (planning — not hard requirements)
+## Resource guidance (measured Phase 2 + planning)
 
 Measured on standard public GHA (run `33862245103`):
 
@@ -70,13 +70,24 @@ memory.peak  ≈ 14.56 GiB
 oom_kill     = 1 during gkrust -Clto
 ```
 
-Therefore standard ~16 GiB is **insufficient**. Planning tiers until measured
-on self-hosted:
+Therefore standard ~16 GiB is **insufficient**.
+
+**Measured** on successful self-hosted Phase 2 run `33895224558` (`librewolf-builder-wsl`):
 
 ```text
-32 GiB RAM:  first Phase 2 trial
-64 GiB RAM:  preferred for Phase 2 and future PGO/CSIR work
-128 GiB+:    future Full C/C++ LTO experiments only; not required for current Phase 2
+MemTotal     ≈ 31.13 GiB
+SwapTotal    ≈ 8.0 GiB
+memory.peak  ≈ 28.39 GiB
+peak swap    ≈ 2.00 GiB used
+oom_kill     = 0
+```
+
+This is one successful profile — **not** a universal minimum. Planning tiers:
+
+```text
+~31 GiB RAM + 8 GiB swap:  proven sufficient for this Phase 2 baseline once
+64 GiB RAM:                preferred headroom for Phase 2 retries / future PGO/CSIR
+128 GiB+:                  future Full C/C++ LTO experiments only; not required for current Phase 2
 ```
 
 LibreWolf historically needed >128 GB for Windows **Full C/C++** LTO link
@@ -103,4 +114,5 @@ use `workflow_dispatch` → `runner_profile=larger-custom` and set
 
 Personal public repositories often **cannot** access larger runners.
 Do not assume availability for this repo.
+
 

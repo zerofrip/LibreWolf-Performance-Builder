@@ -150,37 +150,136 @@ Public-repo GitHub docs list `ubuntu-latest` as **4 CPU / 16 GB**; authoritative
 
 ## GHA run 33895224558 (SUCCESS — Phase 2 self-hosted)
 
+Authoritative close-out run. Workflow: **Baseline Windows (self-hosted manual)** / `workflow_dispatch` / commit `61d3c2c8842fba330d60eaed898148b5b93f70e9` / conclusion **SUCCESS**.
+
+### Artifact inventory (do not confuse layers)
+
+| Kind | Path / name | Notes |
+|------|-------------|-------|
+| GitHub Actions artifact | `baseline-windows-x64-self-hosted` | API `size_in_bytes` **158,567,603** (~151.2 MiB) — wrapper archive, **not** the browser package |
+| Actual browser package | `out/librewolf-155.0-1-windows-x86_64-package.zip` | **158,771,036** bytes |
+| Package checksum file | `out/librewolf-155.0-1-windows-x86_64-package.zip.sha256` | matches package |
+| Metadata | `artifacts/baseline-windows-metadata.json` | pins, toolchain, hashes |
+| Memory evidence | `artifacts/memory-summary.json`, `artifacts/disk/memory-*.txt`, `memory-samples.jsonl` | cgroup + /proc |
+| Build logs | `artifacts/logs/bsys6-build-package.log`, `bsys6-source.log`, `mozconfig-resource.txt` | configure + mach |
+| Toolchain / target | `artifacts/toolchain-probe.txt`, `generated-target.txt` | clang/rustc/cargo |
+| Local-validate sidecar | artifact `baseline-local-validate-self-hosted` | same run; job PASS |
+
+### Browser package proof
+
 | Field | Value |
 |-------|-------|
-| Commit | `61d3c2c` |
-| Runner | `librewolf-builder-wsl` (labels: self-hosted, Linux, X64, librewolf-builder) |
-| Host MemTotal | 32,646,784 kB (~31.13 GiB) |
-| Host SwapTotal | 8,388,608 kB (~8.0 GiB) |
-| Duration | 9610 s (~2 h 40 m) |
-| Target | `x86_64-pc-windows-msvc` |
-| Artifact | `librewolf-155.0-1-windows-x86_64-package.zip` |
-| Size | 158,771,036 bytes (~151.4 MiB) |
+| filename | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| format | Zip (deflate); `unzip -t` → **No errors** |
+| byte size | **158,771,036** |
 | SHA-256 | `455886377761ae45f4bcc250021ce9a20858eb1811d3a99936e4bf076829c054` |
-| Package check | zip OK; contains `librewolf/librewolf.exe`, `xul.dll`, 53 entries |
-| memory.peak | 30,488,612,864 bytes (~28.39 GiB) |
-| Peak swap used | ~2,100,432 kB (~2.00 GiB) from samples (`SwapTotal−SwapFree` max) |
-| oom / oom_kill | **0 / 0** (did not increase) |
-| clang | 21.1.8 (taskcluster) |
-| rustc | 1.97.1 |
-| LibreWolf / Firefox | 155.0-1 / 155.0 |
-| bsys6 | `24c40ffaa25b558e4c5ce9f326bc4466ba7608bc` |
-| source | `03ba053934d5f6c7a11cb472424017caafd607e9` |
-| Upstream PGO | **true** (`--enable-profile-use` in configure/mozconfig) |
-| Upstream C/C++ LTO | **false** (no `--enable-lto`) |
-| Upstream Rust gkrust LTO | **active** (Firefox `rust.mk` default; `Compiling gkrust` succeeded; prior OOM run showed rustc `-Clto`) |
-| Overlay opts | all false |
+| structure | top-level `librewolf/`; **53** entries; uncompressed total listed **486,405,230** |
+| payload | `librewolf/librewolf.exe` (MZ PE), `xul.dll`, `omni.ja`, `browser/omni.ja`, `plugin-container.exe` |
+
+Packaging log: bsys6 moved `librewolf-155.0-1.en-US.win64.zip` → package path; printed matching SHA-256.
+
+### Target / toolchain (from configure + probe — not from filenames)
+
+| Field | Evidence |
+|-------|----------|
+| target triple | configure: `--target=x86_64-pc-windows-msvc`; `checking for target system type... x86_64-pc-windows-msvc`; rust target triplet same; `generated-target.txt` |
+| clang | 21.1.8 (taskcluster-F58RnQSfSg68MZGEByyGQg) |
+| rustc | 1.97.1 (8bab26f4f 2026-07-14) |
+| cargo | 1.97.1 (c980f4866 2026-06-30) |
+| Windows SDK | configure: `0x0a00` in `.../Windows Kits/10`; Universal CRT **10.0.26100.0** |
+
+### Optimization semantics (proven — not copied)
+
+| Key | Value | Evidence |
+|-----|-------|----------|
+| overlay_lto | **false** | empty baseline frag; no overlay LTO env; mozconfig-resource has only CI `-j2` + target |
+| overlay_pgo | **false** | no overlay PGO env / fragments |
+| upstream_cpp_lto | **false** | configure options list has **no** `--enable-lto` |
+| upstream_rust_lto | **true** | see proof chain below |
+| upstream_pgo | **true** | `--enable-profile-use` + `--with-pgo-profile-path=.../assets/windows.profdata` |
+| x86_64_v3 | **false** | no v3 flags in configure / mozconfig-resource |
+| csir | **false** | no CSIR flags |
+
+Upstream PGO profile path basename: **`windows.profdata`**.
+
+**Rust LTO / codegen-units proof chain (this run’s cargo log does not echo rustc cmdline on success):**
+
+1. Built source tarball SHA-256 `5d951d8071ef6bcc4eab8bba1492e269af728c83586437ec2a7db11d46be36f6` (metadata) matches pinned tarball.
+2. That tree’s `config/makefiles/rust.mk`: release staticlib (not gkrust_gtest, not `MOZ_LTO_RUST_CROSS`) adds `cargo_rustc_flags += -Clto`; without `DEVELOPER_OPTIONS`, `RUSTFLAGS += -C codegen-units=1`.
+3. This configure had **no** `--enable-lto` → no cross-language Rust LTO path that would disable the default `-Clto` block.
+4. Log: `Compiling gkrust` @ 63:09.72 → `Finished release profile [optimized] target(s) in 64m 10s` @ 72:43.44 (**PASS**).
+5. Corroboration (same upstream-equivalent pipeline): run `33862245103` rustc line showed `-Clto` … `-C codegen-units=1` before OOM.
+
+Detector note: uploaded `baseline-windows-metadata.json` still has `"upstream_rust_lto": false` / `evidence.upstream_rust_lto: null` because `detect-optimization-state.sh` only sets true when the build log contains a literal `-Clto` rustc line. That is a **detector gap on success logs**, not proof that Rust LTO was off. Authoritative semantics for close-out: **true** via rust.mk + successful gkrust release finish (+ prior run cmdline).
+
+### Former gkrust blocker
+
+| Item | Result |
+|------|--------|
+| gkrust | **PASS** (Finished release, 64m 10s) |
+| Rust LTO | **PASS** (semantics active; crate completed — contrast standard-hosted `33862245103` OOM at same stage) |
+
+### Memory evidence (begin → end)
+
+| Metric | Value |
+|--------|-------|
+| MemTotal | 32,646,784 kB (~31.13 GiB) |
+| SwapTotal | 8,388,608 kB (~8.0 GiB) |
+| memory.max | `max` (unlimited in cgroup) |
+| memory.peak | **30,488,612,864** bytes (~28.39 GiB) |
+| peak swap use | **~2,150,842,368** bytes (~2.00 GiB) max(`SwapTotal−SwapFree`) in `memory-samples.jsonl` |
+| swap.peak (cgroup) | **null** / not exposed as a usable peak field |
+| oom / oom_kill begin | **0 / 0** |
+| oom / oom_kill end | **0 / 0** (unchanged; no OOM kill) |
+| peak RAM / physical RAM | ~0.912 |
+
+### Runner characteristics
+
+| Field | Value |
+|-------|-------|
+| name | `librewolf-builder-wsl` |
+| labels | `self-hosted`, `linux`, `x64`, `librewolf-builder` (job API) |
+| OS | Linux (container build; host_os metadata Linux) |
+| architecture | x86_64 |
+| CPU count | **UNKNOWN** in run artifacts (not recorded); do not invent |
+| RAM | MemTotal 32,646,784 kB |
+| swap | SwapTotal 8,388,608 kB |
+| free disk before build | ~**366G** avail on `/__w` (`before-build.txt`) |
+
+### Phase 2 success chain (close-out)
+
+```text
+local validation              PASS  (job local-validate + artifact)
+self-hosted preflight         PASS  (runner online; required labels)
+target triple                 PASS  (configure x86_64-pc-windows-msvc)
+configure                     PASS
+C/C++ build                   PASS  (build continued past C++ into gkrust + finish)
+gkrust final Rust LTO         PASS
+remaining build               PASS  (Finished packaging locales; overall SUCCESS)
+packaging                     PASS  (bsys6 package.zip + SHA printed)
+real Windows x64 package      PASS  (PE + structure)
+artifact upload               PASS  (baseline-windows-x64-self-hosted)
+package SHA256                RECORDED
+baseline semantics            PASS  (table above)
+memory evidence               RECORDED
+OOM kill during build         NO
+```
+
+Contrast (historical — retain):
+
+```text
+standard GitHub-hosted (33862245103): OOM CONFIRMED
+self-hosted (33895224558):            successful Phase 2 baseline
+```
 
 ```text
 PHASE 2: PASS
-PHASE 3: BLOCKED — awaiting human authorization
+PHASE 3: BLOCKED — awaiting explicit human authorization
+STOP — do not implement v3 / ThinLTO overlay / CSIR / custom toolchains / benchmarks
 ```
 
-Measured on this one successful self-hosted run (~31 GiB RAM host). Do **not** treat 32 GiB / 64 GiB as a universal hard requirement from a single data point.
+Measured memory profile is for **this** successful runner only. Do **not** claim it is the minimum required hardware.
+
 
 
 

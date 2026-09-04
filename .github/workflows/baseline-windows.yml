@@ -1,26 +1,44 @@
 name: Baseline Windows x64 LibreWolf
 
 # Phase 2: upstream-equivalent Windows x64 package (bsys6 tag 155.0-1).
-# Overlay does not enable LTO / x86-64-v3 / CSIR. Failures must not fall back.
-# Note: upstream bsys6 may inject --enable-profile-use when assets/windows.profdata exists.
+# Push/PR always use standard GitHub-hosted runners.
+# Manual dispatch may select self-hosted or optional larger-custom labels.
+# Overlay does not enable LTO / x86-64-v3 / CSIR. Upstream PGO + rust.mk gkrust LTO remain.
 
 on:
   workflow_dispatch:
+    inputs:
+      runner_profile:
+        description: "Runner profile (standard = GitHub-hosted ubuntu-latest)"
+        required: true
+        type: choice
+        default: standard
+        options:
+          - standard
+          - self-hosted
+          - larger-custom
+      larger_runner_label:
+        description: "Only for larger-custom — org-defined larger runner label (e.g. ubuntu-latest-m)"
+        required: false
+        type: string
+        default: ""
   push:
     paths:
       - ".github/workflows/baseline-windows.yml"
+      - ".github/workflows/baseline-windows-reusable.yml"
       - "scripts/**"
       - "configs/mozconfig.baseline.frag"
       - "upstream/**"
   pull_request:
     paths:
       - ".github/workflows/baseline-windows.yml"
+      - ".github/workflows/baseline-windows-reusable.yml"
       - "scripts/**"
       - "configs/mozconfig.baseline.frag"
       - "upstream/**"
 
 concurrency:
-  group: baseline-windows-${{ github.ref }}
+  group: baseline-windows-${{ github.ref }}-${{ github.event_name }}-${{ inputs.runner_profile || 'standard' }}
   cancel-in-progress: true
 
 jobs:
@@ -47,85 +65,60 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
-  build-windows-baseline:
+  # Resolve runs-on JSON for the reusable build job.
+  select-runner:
     needs: local-validate
     runs-on: ubuntu-latest
-    timeout-minutes: 720
-    container:
-      # Prefer Codeberg-published image (worked for toolchain bootstrap in run 33754159563).
-      image: codeberg.org/librewolf/bsys6:windows
-      options: --user root
-    env:
-      TARGET: windows
-      ARCH: x86_64
-      LTO: ""
-      MOZ_PGO: ""
-      # GHA container jobs force HOME=/github/home; the bsys6 Windows image
-      # installs the VS/Windows SDK under /root/.mozbuild (see Dockerfile.windows).
-      HOME: /root
-      MOZBUILD: /root/.mozbuild
-      MOZBUILD_STATE_PATH: /root/.mozbuild
-      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    outputs:
+      profile: ${{ steps.sel.outputs.profile }}
+      runs_on_json: ${{ steps.sel.outputs.runs_on_json }}
     steps:
-      - name: Checkout overlay
-        uses: actions/checkout@v4
-
-      - name: Disk before
-        run: bash scripts/disk-report.sh gha-before
-
-      - name: Install git/curl/jq/git-lfs if missing
-        run: |
-          apt-get update
-          apt-get install -y jq git curl ca-certificates git-lfs
-          git lfs install
-
-      - name: Cache pinned source tarball
-        uses: actions/cache@v4
-        with:
-          path: work/librewolf-155.0-1.source.tar.gz
-          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
-
-      - name: Verify baseline config (no overlay LTO/PGO env)
-        run: bash scripts/verify-baseline-config.sh
-
-      - name: Probe image toolchain paths
-        run: bash scripts/probe-toolchain.sh artifacts/toolchain-probe-pre.txt
-
-      - name: Build upstream-equivalent Windows package
+      - id: sel
         env:
-          # Cap parallelism to reduce OOM / runner-loss on github-hosted VMs.
-          MOZ_MAKE_FLAGS: "-j2"
-          LWPB_TRY_SWAP: "1"
-        run: bash scripts/build-windows-baseline.sh
-
-      - name: Disk after
-        if: always()
-        run: bash scripts/disk-report.sh gha-after
-
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: baseline-windows-x64
-          path: |
-            out/
-            artifacts/
-          if-no-files-found: warn
-          retention-days: 14
-
-      - name: Fail if build metadata status is not ok
+          EVENT_NAME: ${{ github.event_name }}
+          PROFILE_IN: ${{ inputs.runner_profile || 'standard' }}
+          LARGER_LABEL: ${{ inputs.larger_runner_label || '' }}
         run: |
-          test -f artifacts/baseline-windows-metadata.json
-          jq -e '.status == "ok"' artifacts/baseline-windows-metadata.json
-          jq -e '.moz_target == "x86_64-pc-windows-msvc"' artifacts/baseline-windows-metadata.json
-          jq -e '.optimizations.lto == false and .optimizations.x86_64_v3 == false and .optimizations.csir == false' \
-            artifacts/baseline-windows-metadata.json
-          if [[ -f artifacts/generated-target.txt ]]; then
-            grep -F 'x86_64-pc-windows-msvc' artifacts/generated-target.txt
-            if grep -E 'mingw32|mingw64' artifacts/generated-target.txt; then
-              echo "ERROR: generated mozconfig still contains mingw triple" >&2
-              exit 1
-            fi
+          set -euo pipefail
+          # Push/PR always stay on standard GitHub-hosted.
+          if [[ "$EVENT_NAME" != "workflow_dispatch" ]]; then
+            PROFILE=standard
+          else
+            PROFILE="$PROFILE_IN"
           fi
+          case "$PROFILE" in
+            standard)
+              JSON='"ubuntu-latest"'
+              ;;
+            self-hosted)
+              JSON='["self-hosted","linux","x64","librewolf-builder"]'
+              ;;
+            larger-custom)
+              if [[ -z "$LARGER_LABEL" ]]; then
+                echo "ERROR: larger-custom requires larger_runner_label input" >&2
+                exit 1
+              fi
+              # JSON-encode a single label string
+              JSON="$(jq -cn --arg l "$LARGER_LABEL" '$l')"
+              ;;
+            *)
+              echo "ERROR: unknown runner_profile=$PROFILE" >&2
+              exit 1
+              ;;
+          esac
+          echo "profile=$PROFILE" >>"$GITHUB_OUTPUT"
+          {
+            echo "runs_on_json<<EOF"
+            echo "$JSON"
+            echo "EOF"
+          } >>"$GITHUB_OUTPUT"
+          echo "Selected profile=$PROFILE runs_on_json=$JSON"
 
-
+  build-windows-baseline:
+    needs: [local-validate, select-runner]
+    uses: ./.github/workflows/baseline-windows-reusable.yml
+    with:
+      runner_profile: ${{ needs.select-runner.outputs.profile }}
+      runs_on_json: ${{ needs.select-runner.outputs.runs_on_json }}
+      moz_make_flags: "-j2"
+      try_swap: "1"

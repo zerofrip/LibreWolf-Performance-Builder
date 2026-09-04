@@ -1,0 +1,126 @@
+# Reusable Phase 2 Windows baseline build.
+# Called by thin wrappers that only select the runner profile.
+# Does not alter upstream PGO / Firefox rust.mk gkrust LTO behavior.
+
+name: Reusable Baseline Windows Build
+
+on:
+  workflow_call:
+    inputs:
+      runner_profile:
+        description: "standard | self-hosted | larger-custom"
+        required: true
+        type: string
+      runs_on_json:
+        description: 'JSON runs-on value, e.g. "ubuntu-latest" or ["self-hosted","linux","x64","librewolf-builder"]'
+        required: true
+        type: string
+      moz_make_flags:
+        description: Make parallelism for constrained runners
+        required: false
+        type: string
+        default: "-j2"
+      try_swap:
+        description: Attempt best-effort swapfile inside the job container
+        required: false
+        type: string
+        default: "1"
+
+jobs:
+  build-windows-baseline:
+    runs-on: ${{ fromJSON(inputs.runs_on_json) }}
+    timeout-minutes: 720
+    container:
+      image: codeberg.org/librewolf/bsys6:windows
+      options: --user root
+    env:
+      TARGET: windows
+      ARCH: x86_64
+      LTO: ""
+      MOZ_PGO: ""
+      HOME: /root
+      MOZBUILD: /root/.mozbuild
+      MOZBUILD_STATE_PATH: /root/.mozbuild
+      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      LWPB_RUNNER_PROFILE: ${{ inputs.runner_profile }}
+    steps:
+      - name: Checkout overlay
+        uses: actions/checkout@v4
+
+      - name: Disk before
+        run: bash scripts/disk-report.sh gha-before
+
+      - name: Install git/curl/jq/git-lfs/procps if missing
+        run: |
+          apt-get update
+          apt-get install -y jq git curl ca-certificates git-lfs procps
+          git lfs install
+
+      - name: Cache pinned source tarball
+        uses: actions/cache@v4
+        with:
+          path: work/librewolf-155.0-1.source.tar.gz
+          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
+
+      - name: Verify baseline config (no overlay LTO/PGO env)
+        run: bash scripts/verify-baseline-config.sh
+
+      - name: Probe image toolchain paths
+        run: bash scripts/probe-toolchain.sh artifacts/toolchain-probe-pre.txt
+
+      - name: Memory report before build (authoritative cgroup)
+        run: bash scripts/memory-report.sh full memory-pre-build
+
+      - name: Build upstream-equivalent Windows package
+        env:
+          MOZ_MAKE_FLAGS: ${{ inputs.moz_make_flags }}
+          LWPB_TRY_SWAP: ${{ inputs.try_swap }}
+        run: bash scripts/build-windows-baseline.sh
+
+      - name: Disk after
+        if: always()
+        run: bash scripts/disk-report.sh gha-after
+
+      - name: Memory summary after build
+        if: always()
+        run: |
+          bash scripts/memory-report.sh full memory-post-build || true
+          bash scripts/memory-report.sh summary || true
+          if [[ -f artifacts/memory-summary.json ]]; then
+            echo "::notice::memory-summary.json"
+            cat artifacts/memory-summary.json
+          fi
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: baseline-windows-x64-${{ inputs.runner_profile }}
+          path: |
+            out/
+            artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Fail if build metadata status is not ok
+        run: |
+          test -f artifacts/baseline-windows-metadata.json
+          jq -e '.status == "ok"' artifacts/baseline-windows-metadata.json
+          jq -e '.moz_target == "x86_64-pc-windows-msvc"' artifacts/baseline-windows-metadata.json
+          jq -e '
+            .optimizations.overlay_lto == false
+            and .optimizations.x86_64_v3 == false
+            and .optimizations.csir == false
+            and .optimizations.overlay_optimizations == false
+          ' artifacts/baseline-windows-metadata.json
+          if [[ -f artifacts/generated-target.txt ]]; then
+            grep -F 'x86_64-pc-windows-msvc' artifacts/generated-target.txt
+            if grep -E 'mingw32|mingw64' artifacts/generated-target.txt; then
+              echo "ERROR: generated mozconfig still contains mingw triple" >&2
+              exit 1
+            fi
+          fi
+          if [[ -f artifacts/memory-summary.json ]]; then
+            echo "memory-summary present"
+            cat artifacts/memory-summary.json
+          fi

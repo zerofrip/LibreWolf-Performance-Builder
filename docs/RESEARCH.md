@@ -391,7 +391,7 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 | U2 | Exact Clang CSIR merge semantics for current LLVM used by Mozilla toolchain |
 | U3 | SkyKakapo custom compiler requirements |
 | U4 | ~~GHA-hosted complete Windows LibreWolf build feasibility~~ → **CLOSED / INSUFFICIENT** on standard public ubuntu-latest (OOM CONFIRMED `33862245103`). **Self-hosted Phase 2 PASS** on run `33895224558` (~31 GiB host, peak ~28.39 GiB, `oom_kill=0`). |
-| U5 | rustc support for `x86-64-v3` on `x86_64-pc-windows-*` |
+| U5 | ~~rustc support for `x86-64-v3` on `x86_64-pc-windows-*`~~ → **CLOSED / SUPPORTED** (`rustc 1.97.1`, `-C target-cpu=x86-64-v3`, Phase 3 run `33938729218`) |
 | U6 | Wine-based Windows profile collection viability |
 | U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
 | U8 | ~~Whether cgroup oom_kill is readable on GHA container jobs~~ → **CLOSED**: readable (`oom_kill=1`). Kernel `dmesg` still often blocked (`Operation not permitted`). |

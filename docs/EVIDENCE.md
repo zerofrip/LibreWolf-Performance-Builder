@@ -280,10 +280,61 @@ STOP — do not implement v3 / ThinLTO overlay / CSIR / custom toolchains / benc
 
 Measured memory profile is for **this** successful runner only. Do **not** claim it is the minimum required hardware.
 
+## GHA run 33938729218 (SUCCESS — Phase 3 x86-64-v3)
 
+Authoritative Phase 3 close-out. Workflow: **Windows x86-64-v3 (self-hosted manual)** / commit `627e036` / conclusion **SUCCESS**.
 
+Control (Phase 2): run `33895224558` / SHA256 `455886377761ae45f4bcc250021ce9a20858eb1811d3a99936e4bf076829c054`.
 
+### Compiler probes (pinned image toolchain)
 
+| Probe | Result |
+|-------|--------|
+| Clang `21.1.8` `--target=x86_64-pc-windows-msvc` `-march=x86-64-v3` | **PASS** (effective `-target-cpu x86-64-v3`) |
+| rustc `1.97.1` `--print target-cpus` lists `x86-64-v3`; `-C target-cpu=x86-64-v3` compile | **PASS** (`RUST_V3_DIRECT_TARGET=SUPPORTED`) |
 
+### Effective build evidence
 
+| Layer | Requested | Proven |
+|-------|-----------|--------|
+| C (`clang-cl` target) | `-march=x86-64-v3` | **true** (OS_CFLAGS + invocation log) |
+| C++ (`clang-cl -TP`) | `-march=x86-64-v3` | **true** (OS_CXXFLAGS + invocation log) |
+| Rust (windows-msvc) | `-C target-cpu=x86-64-v3` | **true** (RUSTFLAGS + rustc log) |
+| Host/target separation | host without v3 | **true** (HOST_* clean; no host march/cpu leak) |
+
+**Not sufficient:** AVX2/BMI/FMA bytes in the PE alone.
+
+Upstream semantics preserved: `windows.profdata` + `--enable-profile-use`; no `--enable-lto`; gkrust Finished release (~67m) → upstream Rust LTO preserved; no CSIR / ThinLTO overlay.
+
+### Package
+
+| Field | Value |
+|-------|-------|
+| filename | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| bytes | **158,453,627** |
+| SHA-256 | `9f8bf1f1ca45b4a3e8c135c540155f6f5622498d71b7d4467d82e8170fb2f61a` |
+| structure | zip OK; `librewolf.exe` MZ PE; `xul.dll`; `omni.ja` |
+| GHA artifact | `v3-windows-x64-self-hosted` (~158,764,789 bytes wrapper) |
+
+### Memory (same self-hosted class; not a universal minimum)
+
+| Metric | Value |
+|--------|-------|
+| MemTotal | 32,646,784 kB (~31.13 GiB) |
+| SwapTotal | 8,388,608 kB (~8 GiB) |
+| memory.peak | 29,694,058,496 bytes (~27.65 GiB) |
+| peak swap use | ~2,853,756,928 bytes (~2.66 GiB) |
+| oom / oom_kill | **0 / 0** |
+
+### Phase 2 structural comparison
+
+Same package layout (`librewolf/` tree with exe/dll/omni). Size delta vs Phase 2 control (~158.77 MiB → ~151.1 MiB compressed zip bytes as recorded). Hashes differ (expected). **No performance claims.**
+
+```text
+PHASE 3: PASS
+NEXT: BLOCKED — ThinLTO / CSIR / custom toolchains / benchmarks require new human authorization
+STOP
+```
+
+Prior failed attempts (historical): `33927389796` (CC=*.sh configure reject); `33929591494` (full package built; CI false-failed on pipefail PE check — fixed in `a1936cc`/`627e036`).
 

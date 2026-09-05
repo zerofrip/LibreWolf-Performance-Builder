@@ -21,6 +21,7 @@ bash -n scripts/csir-fulltree/prove-csir-fulltree.sh
 bash -n scripts/csir-fulltree/smoke-windows.sh
 bash -n scripts/csir-fulltree/normalize-base-profdata.sh
 bash -n scripts/csir-fulltree/test-base-artifact-layout.sh
+bash -n scripts/csir-fulltree/test-profile-generate-gate.sh
 
 command -v jq >/dev/null
 jq -e '.phase == "6-csir-fulltree"' configs/phase6-csir-fulltree.contract.json
@@ -50,10 +51,17 @@ grep -qi 'own matching LibreWolf IR profile' docs/PHASE6-INTEGRATION.md
 if [[ -s artifacts/csir-fulltree/runs/20260905TPhase6A/profiles/base.profdata ]]; then
   bash scripts/csir-fulltree/test-base-artifact-layout.sh \
     | tee artifacts/csir-fulltree/local-validate/base-artifact-layout.txt
+  bash scripts/csir-fulltree/test-profile-generate-gate.sh \
+    | tee artifacts/csir-fulltree/local-validate/profile-generate-gate.txt
 else
   echo "ERROR: authoritative base.profdata missing for layout tests" >&2
   exit 1
 fi
+
+# Upstream windows.profdata must not be Stage B authority (disable helper present)
+grep -q 'disable_upstream_profdata_asset' scripts/csir-fulltree/common.sh
+grep -Eq 'windows\.profdata\.lwpb-phase6-disabled|lwpb-phase6-disabled' \
+  scripts/csir-fulltree/common.sh scripts/csir-fulltree/build-stage-b.sh
 
 # Probe CSIR flags if docker image available (optional)
 if command -v docker >/dev/null 2>&1 \
@@ -68,4 +76,5 @@ fi
 grep -q 'disable_upstream_profdata_asset' scripts/csir-fulltree/common.sh
 
 echo "PHASE6_LOCAL_VALIDATE=PASS"
+
 

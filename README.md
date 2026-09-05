@@ -14,7 +14,7 @@ This is **not** an official LibreWolf project. It wraps upstream LibreWolf `sour
 | 3 Windows x64 x86-64-v3 baseline | **PASS** — self-hosted run `33938729218` (see EVIDENCE.md) |
 | 4 Windows x64 x86-64-v3 + ThinLTO | **PASS** — self-hosted run `33947898216` (see EVIDENCE; attempt 1 `33946910750` failed pre-compile) |
 | 5 CSIR PGO feasibility PoC | **PASS** — standalone Windows-target pipeline proven (see EVIDENCE); not production LibreWolf CSIR |
-| 6 Full-tree C/C++ CSIR integration PoC | **IN PROGRESS** — Stage A **PASS**; Stage B pending/running (see EVIDENCE) |
+| 6 Full-tree C/C++ CSIR integration PoC | **IN PROGRESS** — Stage A **PASS**; Stage B full-tree build **PASS** (`33969770151`); Windows CSIR training not started |
 | 7+ (benchmarks / Rust CSIR / …) | **BLOCKED** — awaiting explicit human authorization |
 
 ## Quick pins
@@ -24,6 +24,7 @@ See [`upstream/metadata.json`](upstream/metadata.json).
 ## License
 
 Upstream LibreWolf/Firefox code remains under MPL 2.0. Overlay scripts/docs in this repository are also intended to be MPL-2.0-compatible; see `LICENSE` when added.
+
 
 
 

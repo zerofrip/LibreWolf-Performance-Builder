@@ -238,6 +238,15 @@ jobs:
     env:
       LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
     steps:
+      - name: Fix root-owned leftover workspace from container jobs
+        run: |
+          set -euo pipefail
+          # Stage A/B container jobs leave root-owned files; host checkout then fails.
+          WS_PARENT="$(dirname "${GITHUB_WORKSPACE}")"
+          if [[ -d "$WS_PARENT" ]]; then
+            docker run --rm -v "${WS_PARENT}:/w" --user root alpine:3.20 \
+              chown -R "$(id -u):$(id -g)" /w || true
+          fi
       - uses: actions/checkout@v4
       - name: Import authoritative base.profdata
         run: |

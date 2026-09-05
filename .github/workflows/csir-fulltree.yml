@@ -276,9 +276,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: phase6-base-${{ inputs.run_id }}
-          path: |
-            artifacts/csir-fulltree/runs/${{ inputs.run_id }}/profiles/base.profdata
-            artifacts/csir-fulltree/runs/${{ inputs.run_id }}/meta/
+          # Upload only the profile file. Multi-path upload uses LCA as artifact
+          # root (strips artifacts/.../run_id/), which broke Stage B container path
+          # lookup in runs 33966109684 / 33966732281.
+          path: artifacts/csir-fulltree/runs/${{ inputs.run_id }}/profiles/base.profdata
           retention-days: 14
 
   stage-b-build:
@@ -319,10 +320,19 @@ jobs:
           set -euo pipefail
           [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
           BASE="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/base.profdata"
-          test -s "$BASE"
+          mkdir -p "$(dirname "$BASE")"
+          # upload-artifact may place file at ./base.profdata or ./profiles/base.profdata
+          if [[ ! -s "$BASE" ]]; then
+            if [[ -s profiles/base.profdata ]]; then
+              mv -f profiles/base.profdata "$BASE"
+            elif [[ -s base.profdata ]]; then
+              mv -f base.profdata "$BASE"
+            fi
+          fi
+          test -s "$BASE" || { echo "ERROR: base.profdata missing after artifact normalize" >&2; find . -name 'base.profdata' -ls >&2 || true; exit 1; }
           GOT=$(sha256sum "$BASE" | awk '{print $1}')
           EXPECT=6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a
-          echo "base.profdata sha256=$GOT size=$(stat -c%s "$BASE")"
+          echo "base.profdata sha256=$GOT size=$(stat -c%s "$BASE") path=$BASE"
           [[ "$GOT" == "$EXPECT" || "${LWPB_CSIR_ALLOW_BASE_HASH_MISMATCH:-}" == "1" ]] \
             || { echo "ERROR: base hash mismatch" >&2; exit 1; }
           bash scripts/csir-fulltree/preflight-stage-b.sh "$BASE"
@@ -393,4 +403,5 @@ jobs:
             out/
           if-no-files-found: warn
           retention-days: 14
+
 

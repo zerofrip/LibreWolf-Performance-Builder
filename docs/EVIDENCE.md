@@ -584,8 +584,7 @@ STAGE A: PASS
 - upstream `windows.profdata` remains disabled by Stage B orchestration design
 
 ```text
-PHASE 6: IN PROGRESS — Stage A closed; Stage B full-tree build next
-NEXT: Stage B full-tree build (exactly one attempt); STOP before Stage B Windows CSIR training
+PHASE 6: IN PROGRESS — Stage A PASS; Stage B full-tree build PASS (33969770151); training not started
 ```
 
 ### Stage B attempt 33966109684 — FAIL (pre-build only)
@@ -617,4 +616,44 @@ NEXT: Stage B full-tree build (exactly one attempt); STOP before Stage B Windows
 - Expensive `bsys6 build package`: **NOT REACHED**
 - Classification: **PRE-BUILD / mozconfig gate false positive**
 - Fix prepared: match only `ac_add_options --enable-profile-generate` (not auto-redispatched)
+
+### Non-Stage-B runs (do not count)
+
+- `33969373178`: local-validate only / baseline path — **NOT** a Stage B B-build
+- `33969731512`: Phase 6 B-build graph correct (`guard` + `prepare-base-profile` + `stage-b-build`) but **cancelled** by premature job-graph poll before `stage-b-build` materialized; expensive compile **NOT REACHED**; **NOT** an authoritative Stage B attempt
+
+### Stage B full-tree build 33969770151 — PASS (first authoritative expensive Stage B)
+
+| Field | Value |
+|-------|-------|
+| URL | https://github.com/zerofrip/LibreWolf-Performance-Builder/actions/runs/33969770151 |
+| head SHA | `737bf3cdaa6f91bbeab1499f6b675fa996f1cfd6` |
+| workflow | Phase 6 CSIR full-tree (staged) / `B-build` |
+| run_id | `20260905TPhase6A` |
+| base size / SHA256 | 114720872 / `6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a` |
+| canonical base | `artifacts/csir-fulltree/runs/20260905TPhase6A/profiles/base.profdata` |
+| preflight | PASS (in-container) |
+| active `--enable-profile-generate` | ABSENT (comment-only text present) |
+| target | `x86_64-pc-windows-msvc` |
+| expensive compile | **REACHED** (configure ~13:54:25Z; first target `-fprofile-use`+`-fcs-profile-generate` 13:58:53Z) |
+| clang-cl `-fprofile-use=<base>` | 3472 invocations |
+| clang-cl `-fcs-profile-generate` | 4118 invocations |
+| `-fprofile-generate` alone | 0 |
+| profile diagnostics file | empty → **NONE** |
+| package | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| package size / SHA256 | 196095375 / `37cc7cfaef1f68afa36d6b03434e5cc1a566de7a263dc244df08747910b21722` |
+| librewolf.exe SHA256 | `3043dd192cba7fe1fcfc552592ffea961516ab528c8ef710b20dafb5b101209d` |
+| ZIP / PE / xul.dll / omni.ja | PASS / MZ+PE32+ x86-64 / present / present |
+| duration_sec | 10288 (~2.86 h build script; job ~13:45Z–16:46Z UTC) |
+| memory.peak | 26870013952 (~25.0 GiB) |
+| oom / oom_kill | 0 / 0 |
+| Rust CSIR | OFF / NOT AUTHORIZED |
+| Windows CSIR training | **NOT STARTED** |
+
+```text
+STAGE B FULL-TREE BUILD: PASS
+STAGE B WINDOWS CSIR TRAINING: NOT STARTED
+STAGE C / D: NOT STARTED
+PHASE 6: IN PROGRESS — await human review before Stage B training
+```
 

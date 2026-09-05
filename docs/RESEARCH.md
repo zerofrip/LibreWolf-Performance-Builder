@@ -242,9 +242,9 @@ Clang Users Manual workflow:
 
 `-fcs-profile-generate` instruments **after inlining**; cannot be combined with `-fprofile-generate` in the same compile.
 
-**UNKNOWN (Phase 4 gate)**
+**UNKNOWN (CSIR / later-phase gate)**
 
-Exact current merge semantics (weights, sparse/indexed forms, CSIR-specific merge flags) must be re-verified from authoritative LLVM/Clang docs/source **before** Phase 4 implementation. Do not assume a naive `merge base.profdata cs.profraw` is sufficient.
+Exact current merge semantics (weights, sparse/indexed forms, CSIR-specific merge flags) must be re-verified from authoritative LLVM/Clang docs/source **before** CSIR implementation. Do not assume a naive `merge base.profdata cs.profraw` is sufficient.
 
 Firefox has no first-class CSIR switch; integration must be an overlay, not `MOZ_PGO=1` alone.
 
@@ -395,6 +395,7 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 | U6 | Wine-based Windows profile collection viability |
 | U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
 | U8 | ~~Whether cgroup oom_kill is readable on GHA container jobs~~ → **CLOSED**: readable (`oom_kill=1`). Kernel `dmesg` still often blocked (`Operation not permitted`). |
+
 
 
 

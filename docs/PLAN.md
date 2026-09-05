@@ -13,7 +13,7 @@ Windows
 x86_64 only
 x86-64-v3          (Phase 3+)
 ThinLTO           (default LTO mode)
-CSIR PGO          (Phase 4+, only after PoC evidence)
+CSIR PGO          (later phase, only after PoC evidence)
 ```
 
 Phase 2 (current authorization) targets an **upstream-equivalent** Windows x64 package with **no OUR** v3 / CSIR / overlay-LTO flags.
@@ -74,8 +74,8 @@ Mozilla Firefox → LibreWolf source → bsys6 → our overlay → Windows x64 a
 | 1 | PLAN.md | Done / authorized |
 | 2 | Upstream-equivalent Windows x64 CI | **PASS** (self-hosted run `33895224558`) |
 | 3 | x86-64-v3 separate config | **PASS** (self-hosted run `33938729218`; C/C++/Rust proven) |
-| 4 | ThinLTO (Windows x64 + x86-64-v3) | **AUTHORIZED** — first full attempt `33946910750` **FAILED** before compile (see EVIDENCE); corrected workflow not auto-retried |
-| 4–5 | CSIR PGO + CI topology | **Not authorized** until CSIR PoC evidence + separate human authorization |
+| 4 | ThinLTO (Windows x64 + x86-64-v3) | **PASS** — attempt 1 `33946910750` failed pre-compile; fix `520e712`; attempt 2 `33947898216` SUCCESS (see EVIDENCE) |
+| 5+ | CSIR PGO / Full LTO / further opts | **BLOCKED** — needs new human authorization |
 | 6+ | Workload / privacy / bench / update automation | Not authorized yet |
 
 ## Phase 2 design (authorized)
@@ -113,7 +113,7 @@ Resource guidance (updated after measured self-hosted PASS `33895224558`):
 128 GiB+:   future Full C/C++ LTO only; not required for current Phase 2
 ```
 
-See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3 is **PASS**. Phase 4 ThinLTO is **authorized** but the first self-hosted attempt failed before compile (workflow `LTO=false` vs Phase 2 baseline env guard). CSIR / Full LTO / further phases remain **BLOCKED** until explicit human authorization.
+See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3 is **PASS**. Phase 4 ThinLTO is **PASS** (run `33947898216`). CSIR / Full LTO / further phases remain **BLOCKED** until explicit human authorization.
 
 GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`). Prefer self-hosted with measured headroom; do not weaken baseline flags.
 
@@ -168,9 +168,9 @@ Ranked for Phase 2 completion while preserving upstream PGO + Firefox Rust gkrus
 GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`, MemTotal ~15.62 GiB, peak ~14.56 GiB, `oom_kill=1`). Prefer measured self-hosted capacity (run `33895224558` succeeded at ~31 GiB / peak ~28.39 GiB); do not weaken baseline flags.
 
 
-## Phase 4–5 gates (not authorized yet)
+## Phase 5+ gates (CSIR — not authorized yet)
 
-### 4.1 CSIR merge semantics
+### 5.1 CSIR merge semantics
 
 Before implementing CSIR:
 
@@ -179,11 +179,11 @@ Before implementing CSIR:
 - Do **not** assume simply merging `base.profdata` and CS profile data is sufficient
 - Present a minimal deterministic PoC with logs proving instrumentation, merge, and use
 
-### 4.2 Profile compatibility
+### 5.2 Profile compatibility
 
 Windows-profile → Linux-cross-build consumption remains **UNKNOWN** until a minimal deterministic PoC demonstrates it. Incompatibilities must be documented, not papered over.
 
-### 4.3 Failure policy
+### 5.3 Failure policy
 
 Never silently fall back from CSIR PGO to normal PGO, or from x86-64-v3 to generic x86_64.
 
@@ -227,6 +227,7 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 
 
 

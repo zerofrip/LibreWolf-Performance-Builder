@@ -373,4 +373,89 @@ NEXT: corrected workflow ready; full ThinLTO build requires explicit re-dispatch
 STOP — do not auto-retry; do not weaken ThinLTO / enable Full LTO / CSIR
 ```
 
+## GHA run 33947898216 (SUCCESS — Phase 4 x86-64-v3 + ThinLTO)
+
+Authoritative Phase 4 close-out (second authorized attempt). Workflow: **Windows x86-64-v3 + ThinLTO (self-hosted manual)** / commit `4af4d89` / conclusion **SUCCESS**.
+
+### Attempt sequence
+
+| Attempt | Run | Result |
+|---------|-----|--------|
+| 1 | `33946910750` @ `9169ed9` | **FAILED** pre-compile (`LTO=false` vs baseline env guard) |
+| fix | `520e712` | workflow `LTO: ""` at verify boundary |
+| 2 | `33947898216` @ `4af4d89` | **SUCCESS** — configure + ThinLTO effective + package |
+
+Control (Phase 3): run `33938729218` / SHA256 `9f8bf1f1ca45b4a3e8c135c540155f6f5622498d71b7d4467d82e8170fb2f61a`.
+
+### Toolchain / preflight
+
+| Item | Result |
+|------|--------|
+| clang / clang-cl | `21.1.8` |
+| lld-link | `21.1.8` |
+| rustc | `1.97.1` |
+| ThinLTO probe (`-flto=thin` → bitcode) | **PASS** |
+| verify-baseline / v3 / thinlto / privacy | **PASS** |
+
+### Effective ThinLTO (requested vs proven)
+
+| Field | Value |
+|-------|-------|
+| requested | `--enable-lto=thin` (overlay frag; bsys6 `LTO≠true` so no `full,cross`) |
+| autoconf | `MOZ_LTO=1`, `MOZ_LTO_CFLAGS` contains `-flto=thin` |
+| invocations | `clang-cl` with `-flto=thin` **and** `-march=x86-64-v3` |
+| Full LTO | **false** |
+| `MOZ_LTO_RUST_CROSS` | inactive |
+| proven | **thinlto=true** |
+
+### x86-64-v3 preservation (this run)
+
+| Layer | Proven |
+|-------|--------|
+| C | **true** |
+| C++ | **true** |
+| Rust | **true** |
+| host/target separation | **true** |
+
+### Upstream semantics preserved
+
+| Layer | Result |
+|-------|--------|
+| upstream PGO (`windows.profdata` / `--enable-profile-use`) | **true** |
+| upstream Rust LTO (gkrust Finished release) | **true** |
+| overlay PGO / CSIR | **false** |
+| privacy invariants | **PASS** |
+
+### Package
+
+| Field | Value |
+|-------|-------|
+| filename | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| bytes | **160,250,972** |
+| SHA-256 | `aa659fb4836668a73f35c217064e6048c584ac06a01a80d46e64e8041cbdfd6a` |
+| structure | zip OK; `librewolf.exe` MZ PE; `xul.dll`; `omni.ja` |
+| duration_sec | **9072** (~2.52 h build script) |
+| build job wall | ~05:42:38Z → ~08:22:46Z |
+
+### Memory (same self-hosted class; not a universal minimum)
+
+| Metric | Value |
+|--------|-------|
+| MemTotal | 32,646,784 kB (~31.13 GiB) |
+| SwapTotal | 8,388,608 kB (~8 GiB) |
+| memory.peak | 30,108,557,312 bytes (~28.04 GiB) |
+| peak swap use (host SwapFree min) | ~2,828,404 kB (~2.70 GiB) |
+| oom / oom_kill | **0 / 0** |
+
+### Phase 3 structural comparison
+
+Same `librewolf/` layout (exe/dll/omni). Zip bytes: 158,453,627 → 160,250,972 (+1,797,345 / ~+1.13%). Hashes differ (expected). Memory peak ~27.65 → ~28.04 GiB. **No performance claims.**
+
+```text
+PHASE 4: PASS
+NEXT: BLOCKED — CSIR / Full LTO / custom toolchains / benchmarks require new human authorization
+STOP
+```
+
+
 

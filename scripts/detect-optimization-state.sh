@@ -64,6 +64,11 @@ if [[ -f "$BUILD_LOG" ]]; then
       upstream_rust_lto=true
       evidence_rust_lto="build-log rustc -Clto"
     fi
+  elif grep -Eq 'Compiling gkrust ' "$BUILD_LOG" \
+    && grep -Eq 'Finished `release` profile \[optimized\] target\(s\)' "$BUILD_LOG"; then
+    # Success logs often omit rustc argv; finished gkrust release still implies rust.mk -Clto
+    upstream_rust_lto=true
+    evidence_rust_lto="build-log Compiling gkrust Finished release (rust.mk -Clto implied)"
   fi
 fi
 
@@ -138,3 +143,4 @@ jq -n \
       x86_64_v3: (if $evidence_v3=="" then null else $evidence_v3 end)
     }
   }'
+

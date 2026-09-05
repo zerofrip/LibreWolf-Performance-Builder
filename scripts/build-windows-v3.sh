@@ -251,8 +251,10 @@ sha256sum "$ARTIFACT" | tee "${ARTIFACT}.sha256"
 unzip -t "$ARTIFACT" >/dev/null
 unzip -l "$ARTIFACT" | grep -Eq 'librewolf/librewolf\.exe$' \
   || { echo "ERROR: librewolf.exe missing" >&2; exit 1; }
-# Avoid pipefail+SIGPIPE from `head` closing unzip early (false failure on run 33929591494)
-MZ_HDR="$(unzip -p "$ARTIFACT" librewolf/librewolf.exe | dd bs=2 count=1 2>/dev/null | cat)"
+# Avoid pipefail+SIGPIPE from early reader closing unzip (false failure on run 33929591494)
+MZ_HDR="$(set +o pipefail
+  unzip -p "$ARTIFACT" librewolf/librewolf.exe 2>/dev/null | dd bs=2 count=1 2>/dev/null
+  true)"
 [[ "$MZ_HDR" == $'MZ' ]] \
   || { echo "ERROR: librewolf.exe is not PE(MZ)" >&2; exit 1; }
 unzip -l "$ARTIFACT" | grep -Eq 'librewolf/xul\.dll$' \

@@ -257,11 +257,13 @@ CS profiles require `llvm-profdata show --showcs` (without it: Total functions =
 
 **UNPROVEN:** using upstream `windows.profdata` as the CSIR Stage-A base for a future LibreWolf tree CSIR build (IR-format compatible; source/hash correspondence not established).
 
-**UNKNOWN (production CSIR / later-phase gate)**
+**IN PROGRESS (Phase 6 — full-tree integration PoC)**
 
-Exact merge/operational requirements for a full Firefox/LibreWolf CSIR double-instrumented build (jarlog, orderfile, RAM) remain for a separately authorized phase. Do not assume a naive drop-in of `-fcs-profile-generate` into mozconfig.
+Authorized full-tree LibreWolf Windows x64 C/C++ CSIR pipeline using an **own matching** Stage-A IR profile. See `docs/PHASE6-INTEGRATION.md`.
 
-Firefox has no first-class CSIR switch; integration must be an overlay, not `MOZ_PGO=1` alone.
+**SOURCE-SUPPORTED (bsys6):** `src/source.sh` always injects `--enable-profile-use` + `assets/windows.profdata` when the asset exists; Phase 6 disables that asset during Stages A/B/D to keep a single profile authority.
+
+**UNKNOWN until Phase 6 evidence closes:** full-tree resource peaks for Stage A/B, profile CFG matching across stages, and operational Windows training of the full browser.
 
 ---
 
@@ -410,6 +412,7 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 | U6 | Wine-based Windows profile collection viability |
 | U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
 | U8 | ~~Whether cgroup oom_kill is readable on GHA container jobs~~ → **CLOSED**: readable (`oom_kill=1`). Kernel `dmesg` still often blocked (`Operation not permitted`). |
+
 
 
 

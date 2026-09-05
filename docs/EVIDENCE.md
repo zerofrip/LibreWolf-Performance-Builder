@@ -587,3 +587,12 @@ STAGE A: PASS
 PHASE 6: IN PROGRESS — Stage A closed; Stage B full-tree build next
 NEXT: Stage B full-tree build (exactly one attempt); STOP before Stage B Windows CSIR training
 ```
+
+### Stage B attempt 33966109684 — FAIL (pre-build only)
+
+- `prepare-base-profile`: PASS
+- `stage-b-build`: FAIL immediately in container preflight
+- Cause: `preflight-stage-b.sh` invoked nested `docker` inside `bsys6:windows` job (`/root/.docker/config.json: permission denied`)
+- Classification: **CI / preflight** (not profile mismatch; expensive full-tree compile **not started**)
+- Host preflight already PASS; fix: run clang-cl in-image when already inside bsys6 container
+

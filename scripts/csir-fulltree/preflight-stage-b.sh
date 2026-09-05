@@ -26,7 +26,31 @@ EOF
 
 LOG="${META_DIR}/preflight/compile.log"
 set +e
-docker run --rm --user root -v "${ROOT}:/src" -w /src "$IMG" bash -lc "
+if [[ -x /root/.mozbuild/clang/bin/clang-cl ]]; then
+  # Already inside bsys6:windows image (GHA container job) — do not nest docker.
+  (
+    set -euo pipefail
+    export PATH=/root/.mozbuild/clang/bin:$PATH
+    VS=/root/.mozbuild/win-cross/vs
+    MSVC="${VS}/VC/Tools/MSVC/14.50.35717"
+    SDKVER=10.0.26100.0
+    SDK="${VS}/Windows Kits/10"
+    TARGET=x86_64-pc-windows-msvc
+    mkdir -p "${PROF_DIR}/preflight-cs"
+    clang-cl -fms-compatibility-version=19.50 --target="$TARGET" \
+      -imsvc "${MSVC}/include" \
+      -imsvc "${SDK}/Include/${SDKVER}/ucrt" \
+      -imsvc "${SDK}/Include/${SDKVER}/shared" \
+      -imsvc "${SDK}/Include/${SDKVER}/um" \
+      -O2 /Ob0 \
+      "-fprofile-use=${BASE}" \
+      "-fcs-profile-generate=${PROF_DIR}/preflight-cs" \
+      "${META_DIR}/preflight/probe.c" \
+      -c "-Fo${META_DIR}/preflight/probe.obj"
+  ) 2>&1 | tee "$LOG"
+  RC=${PIPESTATUS[0]}
+else
+  docker run --rm --user root -v "${ROOT}:/src" -w /src "$IMG" bash -lc "
 set -euo pipefail
 export PATH=/root/.mozbuild/clang/bin:\$PATH
 VS=/root/.mozbuild/win-cross/vs
@@ -46,7 +70,8 @@ clang-cl -fms-compatibility-version=19.50 --target=\$TARGET \
   /src/${META_REL}/preflight/probe.c \
   -c -Fo/src/${META_REL}/preflight/probe.obj
 " 2>&1 | tee "$LOG"
-RC=${PIPESTATUS[0]}
+  RC=${PIPESTATUS[0]}
+fi
 set -e
 
 if grep -Eiq 'malformed instrumentation profile|no profile data available' "$LOG"; then

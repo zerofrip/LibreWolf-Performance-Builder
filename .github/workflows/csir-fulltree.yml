@@ -342,9 +342,64 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  stage-d-build:
+  prepare-combined-profile:
     if: inputs.stage == 'D-build'
     needs: guard
+    runs-on: [self-hosted, linux, x64, librewolf-builder]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - name: Fix root-owned leftover workspace from container jobs
+        run: |
+          set -euo pipefail
+          WS_PARENT="$(dirname "${GITHUB_WORKSPACE}")"
+          if [[ -d "$WS_PARENT" ]]; then
+            docker run --rm -v "${WS_PARENT}:/w" --user root alpine:3.20 \
+              chown -R "$(id -u):$(id -g)" /w || true
+          fi
+      - uses: actions/checkout@v4
+      - name: Import authoritative combined.profdata
+        run: |
+          set -euo pipefail
+          [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
+          DEST="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles"
+          mkdir -p "$DEST" "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta"
+          if [[ ! -s "${DEST}/combined.profdata" ]]; then
+            SRC="/home/zero/github/LibreWolf-Performance-Builder/artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/combined.profdata"
+            [[ -s "$SRC" ]] || { echo "ERROR: missing combined.profdata at $SRC" >&2; exit 1; }
+            cp -a "$SRC" "${DEST}/combined.profdata"
+          fi
+          sha256sum "${DEST}/combined.profdata" | tee "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta/combined-profdata.sha256"
+          EXPECT=bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9
+          GOT=$(awk '{print $1}' "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta/combined-profdata.sha256")
+          SIZE=$(stat -c%s "${DEST}/combined.profdata")
+          [[ "$GOT" == "$EXPECT" ]] || { echo "ERROR: combined SHA256 mismatch got=$GOT expect=$EXPECT" >&2; exit 1; }
+          [[ "$SIZE" == "150638760" ]] || { echo "ERROR: combined size mismatch got=$SIZE" >&2; exit 1; }
+          # Lineage snapshot
+          jq -n \
+            --arg stage_a "33957505019" \
+            --arg base "6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a" \
+            --arg stage_b "33969770151" \
+            --arg stage_b_head "737bf3cdaa6f91bbeab1499f6b675fa996f1cfd6" \
+            --arg pkg "37cc7cfaef1f68afa36d6b03434e5cc1a566de7a263dc244df08747910b21722" \
+            --arg cs_raw "379728a56f64859509cc14117e56a878d5954a87333f505b2b3e4bec72bfd3df" \
+            --arg cs "068c1a158d6933974fa45365903f98ff6404b8700a6bd0f4ce858952744d5f7e" \
+            --arg combined "$GOT" \
+            '{stage:"D-lineage",stage_a_run:$stage_a,base_sha256:$base,stage_b_run:$stage_b,stage_b_head:$stage_b_head,stage_b_package_sha256:$pkg,cs_raw_manifest_sha256:$cs_raw,cs_profdata_sha256:$cs,combined_profdata_sha256:$combined}' \
+            > "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta/stage-d-lineage.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase6-combined-${{ inputs.run_id }}
+          path: artifacts/csir-fulltree/runs/${{ inputs.run_id }}/profiles/combined.profdata
+          retention-days: 14
+
+  stage-d-build:
+    if: inputs.stage == 'D-build'
+    needs: [guard, prepare-combined-profile]
     runs-on: [self-hosted, linux, x64, librewolf-builder]
     timeout-minutes: 720
     container:
@@ -372,16 +427,18 @@ jobs:
           path: work/librewolf-155.0-1.source.tar.gz
           key: lw-source-${{ hashFiles('upstream/metadata.json') }}
       - uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          pattern: phase6-*
-          merge-multiple: true
+          name: phase6-combined-${{ inputs.run_id }}
           path: .
       - name: Stage D final build
         run: |
+          set -euo pipefail
           [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
+          chmod +x scripts/csir-fulltree/*.sh
+          bash scripts/csir-fulltree/normalize-combined-profdata.sh "${LWPB_CSIR_RUN_ID}" .
           COMB="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/combined.profdata"
           test -s "$COMB"
+          echo "Stage D canonical combined: $COMB $(sha256sum "$COMB")"
           bash scripts/csir-fulltree/build-stage-d.sh "$COMB"
       - if: always()
         run: bash scripts/memory-report.sh summary || true
@@ -395,6 +452,7 @@ jobs:
             out/
           if-no-files-found: warn
           retention-days: 14
+
 
 
 

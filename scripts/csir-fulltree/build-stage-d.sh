@@ -11,7 +11,18 @@ source "${ROOT}/scripts/csir-fulltree/common.sh"
 COMBINED="${1:-${LWPB_CSIR_COMBINED_PROFDATA:-${PROF_DIR}/combined.profdata}}"
 require_nonempty "$COMBINED"
 COMBINED_SHA="$(json_sha256 "$COMBINED")"
+COMBINED_SIZE="$(stat -c%s "$COMBINED")"
 COMBINED_ABS="$(cd "$(dirname "$COMBINED")" && pwd)/$(basename "$COMBINED")"
+EXPECT_COMBINED_SHA="${LWPB_CSIR_COMBINED_EXPECT_SHA:-bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9}"
+EXPECT_COMBINED_SIZE="${LWPB_CSIR_COMBINED_EXPECT_SIZE:-150638760}"
+if [[ "$COMBINED_SHA" != "$EXPECT_COMBINED_SHA" ]]; then
+  echo "ERROR: combined.profdata SHA256 mismatch got=$COMBINED_SHA expect=$EXPECT_COMBINED_SHA" >&2
+  exit 1
+fi
+if [[ "$COMBINED_SIZE" != "$EXPECT_COMBINED_SIZE" ]]; then
+  echo "ERROR: combined.profdata size mismatch got=$COMBINED_SIZE expect=$EXPECT_COMBINED_SIZE" >&2
+  exit 1
+fi
 
 export DISK_REPORT_DIR="${ROOT}/artifacts/disk"
 mkdir -p "${ROOT}/artifacts" "${ROOT}/work" "${ROOT}/out" "$DISK_REPORT_DIR" \
@@ -173,8 +184,10 @@ regenerate_mozconfig "${LWPB_BSYS6_DIR}" "$MOZCONFIG_PATH" \
 grep -q 'LWPB_PHASE6_CSIR_FINAL' "$MOZCONFIG_PATH" || exit 1
 grep -Eq -- '--enable-lto=thin' "$MOZCONFIG_PATH" || exit 1
 grep -Fq -- "$COMBINED_ABS" "$MOZCONFIG_PATH" || exit 1
-if grep -Eq -- '--enable-profile-generate|fcs-profile-generate' "$MOZCONFIG_PATH"; then
+if grep -Eq '^[[:space:]]*ac_add_options[[:space:]]+--enable-profile-generate' "$MOZCONFIG_PATH" \
+  || grep -Eq 'fcs-profile-generate' "$MOZCONFIG_PATH"; then
   echo "ERROR: Stage D must not generate profiles/CSIR" >&2
+  grep -nE 'profile-generate|fcs-profile' "$MOZCONFIG_PATH" >&2 || true
   exit 1
 fi
 if grep -Eq -- 'windows\.profdata' "$MOZCONFIG_PATH"; then
@@ -252,3 +265,4 @@ bash "${ROOT}/scripts/prove-thinlto.sh" \
 "${ROOT}/scripts/check-privacy-invariants.sh"
 STATUS="ok"
 echo "Stage D package complete: $ARTIFACT combined_sha=$COMBINED_SHA"
+

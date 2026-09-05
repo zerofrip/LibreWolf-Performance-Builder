@@ -15,6 +15,7 @@ bash -n scripts/csir-fulltree/build-stage-d.sh
 bash -n scripts/csir-fulltree/train-windows.sh
 bash -n scripts/csir-fulltree/merge-base.sh
 bash -n scripts/csir-fulltree/merge-combined.sh
+bash -n scripts/csir-fulltree/merge-cs.sh
 bash -n scripts/csir-fulltree/apply-stage-b-mozconfig.sh
 bash -n scripts/csir-fulltree/preflight-stage-b.sh
 bash -n scripts/csir-fulltree/prove-csir-fulltree.sh
@@ -76,5 +77,6 @@ fi
 grep -q 'disable_upstream_profdata_asset' scripts/csir-fulltree/common.sh
 
 echo "PHASE6_LOCAL_VALIDATE=PASS"
+
 
 

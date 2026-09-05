@@ -584,7 +584,7 @@ STAGE A: PASS
 - upstream `windows.profdata` remains disabled by Stage B orchestration design
 
 ```text
-PHASE 6: IN PROGRESS — Stage A PASS; Stage B full-tree build PASS (33969770151); training not started
+PHASE 6: IN PROGRESS — Stage A PASS; Stage B full-tree PASS; Stage B Windows CSIR training PASS; Stage C not started
 ```
 
 ### Stage B attempt 33966109684 — FAIL (pre-build only)
@@ -655,5 +655,37 @@ STAGE B FULL-TREE BUILD: PASS
 STAGE B WINDOWS CSIR TRAINING: NOT STARTED
 STAGE C / D: NOT STARTED
 PHASE 6: IN PROGRESS — await human review before Stage B training
+```
+
+### Stage B Windows CSIR training — PASS
+
+| Field | Value |
+|-------|-------|
+| Package run | `33969770151` |
+| Package SHA256 | `37cc7cfaef1f68afa36d6b03434e5cc1a566de7a263dc244df08747910b21722` |
+| librewolf.exe SHA256 | `3043dd192cba7fe1fcfc552592ffea961516ab528c8ef710b20dafb5b101209d` |
+| Artifact wrapper digest | `sha256:83116645e39cc3875086da8182149cccdc6bc1173897439368e8c471b943264e` |
+| Windows | `10.0.26200.9278` x86_64; WSL→`cmd.exe` (Wine unused) |
+| Workload SHA256 | `fb0a10a0edef864eb99f69f2d396b66ba3dd010a1a60330f835d745cc1894362` (same as Stage A) |
+| Profile dir | `profiles/stage-b-raw` (fresh; 0 files before) |
+| LLVM_PROFILE_FILE | `csir-%p-%m.profraw` under Windows Public train root (overrides compile-time Linux `cs-gen` path) |
+| Timeout / exit | 420s then `taskkill`; forced exit; `browser_exit=1` |
+| CS profraw | 6 files; 56639648 bytes; min 119472; max 53365064 |
+| Manifest SHA256 | `379728a56f64859509cc14117e56a878d5954a87333f505b2b3e4bec72bfd3df` |
+| llvm-profdata | **21.1.8**; each raw `show --showcs` PASS |
+| cs.profdata size / SHA256 | 113442720 / `068c1a158d6933974fa45365903f98ff6404b8700a6bd0f4ce858952744d5f7e` |
+| show (no --showcs) | Total functions: **0** (expected for CS-only; Phase 5 pattern) |
+| show --showcs | Total functions: **413650**; Max function count: 3695018 |
+| Scale | **PLAUSIBLE FULL-TREE** (≈ Stage A base 409899 functions; Gecko/JS/DOM symbols present) |
+| combined.profdata | **NOT CREATED** |
+| Runtime diagnostics | 3× `LLVM Profile Error: File exists` on child pid dumps — **NON-MATERIAL** (collected set still full-tree CS scale) |
+
+```text
+STAGE B FULL-TREE BUILD: PASS
+STAGE B WINDOWS CSIR TRAINING: PASS
+STAGE B: PASS
+STAGE C: NOT STARTED
+STAGE D: NOT STARTED
+PHASE 6: IN PROGRESS — await human review before Stage C (base+cs merge)
 ```
 

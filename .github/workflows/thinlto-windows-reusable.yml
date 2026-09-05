@@ -36,7 +36,10 @@ jobs:
     env:
       TARGET: windows
       ARCH: x86_64
-      LTO: "false"
+      # Empty (not "false"): verify-baseline-config rejects any non-empty LTO.
+      # build-windows-thinlto.sh exports LTO=false after that gate so bsys6
+      # cannot inject --enable-lto=full,cross.
+      LTO: ""
       MOZ_PGO: ""
       HOME: /root
       MOZBUILD: /root/.mozbuild

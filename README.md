@@ -12,7 +12,8 @@ This is **not** an official LibreWolf project. It wraps upstream LibreWolf `sour
 | 1 Plan | Done — see [docs/PLAN.md](docs/PLAN.md) |
 | 2 Upstream-equivalent Windows x64 baseline | **PASS** — closed on self-hosted run `33895224558` (see [docs/EVIDENCE.md](docs/EVIDENCE.md)) |
 | 3 Windows x64 x86-64-v3 baseline | **PASS** — self-hosted run `33938729218` (see EVIDENCE.md) |
-| 4+ (CSIR / ThinLTO / …) | **BLOCKED** — awaiting explicit human authorization |
+| 4 Windows x64 x86-64-v3 + ThinLTO | **IN PROGRESS / first attempt FAILED** — run `33946910750` (see EVIDENCE); not auto-retried |
+| 5+ (CSIR / Full LTO / …) | **BLOCKED** — awaiting explicit human authorization |
 
 ## Quick pins
 
@@ -21,6 +22,7 @@ See [`upstream/metadata.json`](upstream/metadata.json).
 ## License
 
 Upstream LibreWolf/Firefox code remains under MPL 2.0. Overlay scripts/docs in this repository are also intended to be MPL-2.0-compatible; see `LICENSE` when added.
+
 
 
 

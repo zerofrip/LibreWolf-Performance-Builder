@@ -74,8 +74,8 @@ Mozilla Firefox → LibreWolf source → bsys6 → our overlay → Windows x64 a
 | 1 | PLAN.md | Done / authorized |
 | 2 | Upstream-equivalent Windows x64 CI | **PASS** (self-hosted run `33895224558`) |
 | 3 | x86-64-v3 separate config | **PASS** (self-hosted run `33938729218`; C/C++/Rust proven) |
-| 4 | ThinLTO / further opts | **BLOCKED** — needs new human authorization |
-| 4–5 | CSIR PGO + CI topology | **Not authorized** until CSIR PoC evidence |
+| 4 | ThinLTO (Windows x64 + x86-64-v3) | **AUTHORIZED** — first full attempt `33946910750` **FAILED** before compile (see EVIDENCE); corrected workflow not auto-retried |
+| 4–5 | CSIR PGO + CI topology | **Not authorized** until CSIR PoC evidence + separate human authorization |
 | 6+ | Workload / privacy / bench / update automation | Not authorized yet |
 
 ## Phase 2 design (authorized)
@@ -113,7 +113,7 @@ Resource guidance (updated after measured self-hosted PASS `33895224558`):
 128 GiB+:   future Full C/C++ LTO only; not required for current Phase 2
 ```
 
-See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3 is **PASS**. ThinLTO / CSIR / further phases remain **BLOCKED** until explicit human authorization.
+See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3 is **PASS**. Phase 4 ThinLTO is **authorized** but the first self-hosted attempt failed before compile (workflow `LTO=false` vs Phase 2 baseline env guard). CSIR / Full LTO / further phases remain **BLOCKED** until explicit human authorization.
 
 GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`). Prefer self-hosted with measured headroom; do not weaken baseline flags.
 
@@ -227,6 +227,7 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 
 
 

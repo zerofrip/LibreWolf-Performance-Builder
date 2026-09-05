@@ -233,7 +233,15 @@ if [[ "${#ZIPS[@]}" -eq 0 ]]; then
   exit 1
 fi
 
-ARTIFACT_SRC="${ZIPS[0]}"
+ARTIFACT_SRC=""
+for z in "${ZIPS[@]}"; do
+  case "$(basename "$z")" in
+    librewolf-*-windows-x86_64-package.zip) ARTIFACT_SRC="$z"; break ;;
+  esac
+done
+if [[ -z "$ARTIFACT_SRC" ]]; then
+  ARTIFACT_SRC="${ZIPS[0]}"
+fi
 ARTIFACT_NAME="$(basename "$ARTIFACT_SRC")"
 ARTIFACT="${ROOT}/out/${ARTIFACT_NAME}"
 cp -f "$ARTIFACT_SRC" "$ARTIFACT"
@@ -243,7 +251,9 @@ sha256sum "$ARTIFACT" | tee "${ARTIFACT}.sha256"
 unzip -t "$ARTIFACT" >/dev/null
 unzip -l "$ARTIFACT" | grep -Eq 'librewolf/librewolf\.exe$' \
   || { echo "ERROR: librewolf.exe missing" >&2; exit 1; }
-unzip -p "$ARTIFACT" librewolf/librewolf.exe | head -c 2 | grep -q $'MZ' \
+# Avoid pipefail+SIGPIPE from `head` closing unzip early (false failure on run 33929591494)
+MZ_HDR="$(unzip -p "$ARTIFACT" librewolf/librewolf.exe | dd bs=2 count=1 2>/dev/null | cat)"
+[[ "$MZ_HDR" == $'MZ' ]] \
   || { echo "ERROR: librewolf.exe is not PE(MZ)" >&2; exit 1; }
 unzip -l "$ARTIFACT" | grep -Eq 'librewolf/xul\.dll$' \
   || { echo "ERROR: xul.dll missing" >&2; exit 1; }
@@ -262,4 +272,5 @@ TARGET=windows ARCH=x86_64 "${ROOT}/scripts/verify-windows-target.sh"
 
 STATUS="ok"
 echo "Phase 3 x86-64-v3 package complete: $ARTIFACT"
+
 

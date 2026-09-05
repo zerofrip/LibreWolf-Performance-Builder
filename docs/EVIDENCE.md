@@ -501,9 +501,39 @@ bash scripts/csir-poc/run-pipeline.sh
 
 ```text
 PHASE 5: PASS (feasibility PoC only)
-NEXT: BLOCKED — production LibreWolf CSIR / Full LTO / Rust CSIR / benchmarks require new human authorization
-STOP
+NEXT: Phase 6 full-tree C/C++ CSIR authorized — see docs/PHASE6-INTEGRATION.md
 ```
+
+## Phase 6 — Full-tree C/C++ CSIR (IN PROGRESS)
+
+**Authorization:** full-tree LibreWolf Windows x64 C/C++ CSIR integration PoC only.
+**Not authorized:** benchmarks, Rust CSIR, custom LLVM/Rust, Full LTO, public release, performance claims.
+
+### Design authority
+
+- Map: `docs/PHASE6-INTEGRATION.md`
+- Contract: `configs/phase6-csir-fulltree.contract.json`
+- Stages: A base-gen → Windows train → merge base → B CS-gen → train → merge combined → D final (v3+ThinLTO+combined)
+- Stage A base: **own matching LibreWolf IR profile** (upstream `windows.profdata` **not** Stage-A authority)
+- bsys6 `assets/windows.profdata` disabled during A/B/D (`disable_upstream_profdata_asset`) to prevent dual-profile injection (**SOURCE-SUPPORTED**)
+
+### Scaffolding status
+
+| Item | Status |
+|------|--------|
+| Integration map + stage mozconfig frags | PRESENT |
+| Training workload `workloads/csir-train/` | PRESENT |
+| `scripts/csir-fulltree/*` Stage A/B/D + merge/train/prove | PRESENT |
+| `scripts/local-validate-csir-fulltree.sh` | PASS (syntax/contract/privacy) |
+| Staged workflow `csir-fulltree.yml` | PRESENT |
+| Stage A full-tree build evidence | PENDING |
+| Stage B–D evidence | PENDING |
+
+```text
+PHASE 6: IN PROGRESS
+NEXT: Stage A full-tree instrumented build on self-hosted runner
+```
+
 
 
 

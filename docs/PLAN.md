@@ -114,7 +114,7 @@ Resource guidance (updated after measured self-hosted PASS `33895224558`):
 128 GiB+:   future Full C/C++ LTO only; not required for current Phase 2
 ```
 
-See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3–4 are **PASS**. Phase 5 CSIR PoC is **PASS** (standalone; not production LibreWolf CSIR). Production CSIR / Full LTO / further phases remain **BLOCKED** until explicit human authorization.
+See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3–5 are **PASS**. Phase 6 full-tree C/C++ CSIR is **authorized and in progress** (`docs/PHASE6-INTEGRATION.md`). Benchmarks / Rust CSIR / Full LTO / public release remain **BLOCKED**.
 
 GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`). Prefer self-hosted with measured headroom; do not weaken baseline flags.
 
@@ -169,7 +169,19 @@ Ranked for Phase 2 completion while preserving upstream PGO + Firefox Rust gkrus
 GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`, MemTotal ~15.62 GiB, peak ~14.56 GiB, `oom_kill=1`). Prefer measured self-hosted capacity (run `33895224558` succeeded at ~31 GiB / peak ~28.39 GiB); do not weaken baseline flags.
 
 
-## Phase 5+ gates (CSIR — not authorized yet)
+## Phase 5+ gates (CSIR)
+
+### Phase 5 — standalone PoC: **PASS**
+
+See `docs/EVIDENCE.md`. Pipeline A→B→C→D proven on minimal Windows-target program (Clang 21.1.8). Upstream `windows.profdata` as LibreWolf Stage-A base remains **UNPROVEN**.
+
+### Phase 6 — full-tree C/C++ CSIR: **AUTHORIZED / IN PROGRESS**
+
+Integration map: `docs/PHASE6-INTEGRATION.md`.
+
+Orchestration: `.github/workflows/csir-fulltree.yml` (staged; WSL→Windows training on existing self-hosted host).
+
+Own matching LibreWolf base IR profile required (do not use upstream `windows.profdata` as Stage A).
 
 ### 5.1 CSIR merge semantics
 
@@ -182,7 +194,7 @@ Before implementing CSIR:
 
 ### 5.2 Profile compatibility
 
-Windows-profile → Linux-cross-build consumption remains **UNKNOWN** until a minimal deterministic PoC demonstrates it. Incompatibilities must be documented, not papered over.
+Windows-profile → Linux-cross-build consumption: **PROVEN** in Phase 5 PoC. Full-tree matching provenance: Phase 6 objective.
 
 ### 5.3 Failure policy
 
@@ -228,6 +240,7 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 
 
 

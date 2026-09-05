@@ -53,7 +53,11 @@ if [[ -z "$MOZCONFIG" || ! -f "$MOZCONFIG" ]]; then
   [[ -n "$cand" ]] && MOZCONFIG="$cand"
 fi
 
-OPT_JSON="$("${ROOT}/scripts/detect-optimization-state.sh" "${MOZCONFIG:-}" "${BUILD_LOG:-}" "${ROOT}/artifacts/v3-proof.json")"
+OPT_JSON="$("${ROOT}/scripts/detect-optimization-state.sh" \
+  "${MOZCONFIG:-}" \
+  "${BUILD_LOG:-}" \
+  "${ROOT}/artifacts/v3-proof.json" \
+  "${ROOT}/artifacts/thinlto-proof.json")"
 
 RUNNER_PROFILE="${LWPB_RUNNER_PROFILE:-unknown}"
 PHASE_NAME="${LWPB_BUILD_PHASE:-2-baseline}"
@@ -110,4 +114,5 @@ jq -n \
 
 echo "Wrote metadata $OUT"
 cat "$OUT"
+
 

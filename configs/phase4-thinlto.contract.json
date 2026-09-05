@@ -1,0 +1,33 @@
+{
+  "phase": "4-x86-64-v3-thinlto",
+  "target_os": "Windows",
+  "target_architecture": "x86_64",
+  "target_triple": "x86_64-pc-windows-msvc",
+  "cpu_baseline": "x86-64-v3",
+  "host_specific_tuning": false,
+  "x86_64_v4": false,
+  "requested": {
+    "c_x86_64_v3": true,
+    "cpp_x86_64_v3": true,
+    "rust_x86_64_v3": true,
+    "overlay_lto": true,
+    "overlay_lto_mode": "thin",
+    "overlay_pgo": false,
+    "upstream_cpp_lto": true,
+    "upstream_cpp_lto_mode": "thin",
+    "upstream_rust_lto": true,
+    "upstream_pgo": true,
+    "csir": false,
+    "full_lto": false,
+    "cross_language_lto": false
+  },
+  "c_mechanism": "-march=x86-64-v3",
+  "cpp_mechanism": "-march=x86-64-v3",
+  "rust_mechanism": "-C target-cpu=x86-64-v3",
+  "lto_mechanism": "ac_add_options --enable-lto=thin",
+  "notes": [
+    "Do not enable --enable-lto=full or ,cross",
+    "bsys6 LTO=true must stay unset (would inject full,cross)",
+    "requested.* is the contract; proven.* must come from evidence"
+  ]
+}

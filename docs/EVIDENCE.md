@@ -606,3 +606,15 @@ NEXT: Stage B full-tree build (exactly one attempt); STOP before Stage B Windows
 - Classification: **CI / artifact path layout** (PRE-BUILD)
 - Fix prepared (not auto-dispatched): normalize `./base.profdata` or `./profiles/base.profdata` → canonical path
 
+### Stage B attempt 33968632816 — FAIL (mozconfig comment false positive)
+
+- Normalize LAYOUT C (`./base.profdata`) → canonical path: **PASS**
+- base SHA256 `6b57dfab…099a` / size 114720872: **PASS**
+- In-container preflight: **PASS**
+- upstream `windows.profdata`: disabled: **PASS**
+- Failure: `ERROR: profile-generate must be OFF in Stage B` after `apply-stage-b-mozconfig`
+- Cause: `grep -- '--enable-profile-generate'` matched **comment** in `mozconfig.csir-cs-gen.frag` ("Must NOT also --enable-profile-generate")
+- Expensive `bsys6 build package`: **NOT REACHED**
+- Classification: **PRE-BUILD / mozconfig gate false positive**
+- Fix prepared: match only `ac_add_options --enable-profile-generate` (not auto-redispatched)
+

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/><title>LWPB CSIR Train — DOM</title>
+<style>.row{display:flex;gap:4px;flex-wrap:wrap}.cell{width:12px;height:12px;background:#456}</style>
+</head>
+<body>
+  <h1>DOM / layout</h1>
+  <div class="row" id="grid"></div>
+  <script>
+    const g = document.getElementById('grid');
+    for (let i = 0; i < 400; i++) {
+      const d = document.createElement('div');
+      d.className = 'cell';
+      d.style.opacity = String((i % 10) / 10);
+      g.appendChild(d);
+    }
+    window.scrollTo(0, 200);
+  </script>
+  <p><a href="index.html">home</a></p>
+</body>
+</html>

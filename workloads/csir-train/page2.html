@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"/><title>LWPB CSIR Train — Page2</title></head>
+<body>
+  <h1>Page 2</h1>
+  <p id="out">init</p>
+  <script>
+    let s = 0;
+    for (let i = 0; i < 200000; i++) s = (s + i * 3) % 1000003;
+    document.getElementById('out').textContent = 'checksum=' + s;
+    sessionStorage.setItem('lwpb_csir', String(s));
+    localStorage.setItem('lwpb_csir_ls', String(s));
+  </script>
+  <p><a href="index.html">home</a></p>
+</body>
+</html>

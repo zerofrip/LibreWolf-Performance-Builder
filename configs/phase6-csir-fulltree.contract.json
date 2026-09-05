@@ -1,0 +1,24 @@
+{
+  "phase": "6-csir-fulltree",
+  "scope": "LibreWolf full-tree C/C++ CSIR integration PoC",
+  "not_authorized": [
+    "performance benchmarks",
+    "Rust CSIR",
+    "custom LLVM",
+    "custom Rust",
+    "Full LTO",
+    "public release"
+  ],
+  "stage_a_base_authority": "own matching LibreWolf IR profile",
+  "upstream_windows_profdata_as_stage_a": false,
+  "stages": ["A-base-gen", "B-cs-gen", "C-merge", "D-final"],
+  "final_expected": {
+    "x86_64_v3": true,
+    "thinlto": true,
+    "full_lto": false,
+    "cpp_profile_use": "combined.profdata",
+    "cpp_cs_profile_generate": false,
+    "rust_csir": false,
+    "upstream_rust_lto": true
+  }
+}

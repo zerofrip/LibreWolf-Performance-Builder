@@ -457,5 +457,54 @@ NEXT: BLOCKED — CSIR / Full LTO / custom toolchains / benchmarks require new h
 STOP
 ```
 
+## Phase 5 — CSIR PGO feasibility PoC (PASS — standalone)
+
+Not a LibreWolf production CSIR build. Minimal Windows-target program under `tests/csir-poc/`, toolchain = pinned `bsys6:windows` Clang/LLVM **21.1.8**, Windows execution via **WSL2 → real Windows PE loader** (Wine not used). No GitHub-hosted Windows runner exists; only `librewolf-builder-wsl` (Linux).
+
+### Toolchain semantics (PROVEN)
+
+| Check | Result |
+|-------|--------|
+| `-fprofile-generate` alone | PASS |
+| `-fcs-profile-generate` alone | PASS |
+| both in same compile | **REJECTED** — `invalid argument '-fcs-profile-generate' not allowed with '-fprofile-generate'` |
+| custom LLVM | **not required** |
+
+### Pipeline results
+
+| Stage | Result | Notes |
+|-------|--------|-------|
+| A base IR build + Windows run | PASS | PE; `.profraw` LLVM raw v10; stdout `CSIR_POC_RESULT a=34024000 b=36104000` |
+| A Linux `llvm-profdata merge` | PASS | `base.profdata`; symbols `shared_function` / `hot_path_*` visible |
+| B CSIR gen (`-fprofile-use` + `-fcs-profile-generate`) | PASS | `/Ob0` for CFG stability vs Stage A |
+| B Windows run + CS `.profraw` | PASS | non-empty |
+| CS nature | **PRESENT** | `llvm-profdata show` needs `--showcs` (else Total functions=0); non-zero `shared_function` counters |
+| C merge `base`+`cs` → `combined.profdata` | PASS | ordinary `llvm-profdata merge` |
+| D final `-fprofile-use=combined` | PASS | PE; **profile consumption PROVEN** (PE SHA256 ≠ no-profile build) |
+| D Windows run | PASS | same deterministic result |
+| ThinLTO + v3 + combined profile | PASS | micro-compat only |
+
+### Upstream `windows.profdata`
+
+| Fact | Class |
+|------|-------|
+| IR instrumentation profile; `llvm-profdata show` works (414217 functions) | PROVEN |
+| clang-cl accepts `-fprofile-use=windows.profdata` on unrelated PoC (exit 0, no warnings observed) | PROVEN |
+| Valid automatic CSIR Stage-A base for future LibreWolf tree | **UNPROVEN** — need matching instrumented LibreWolf base profile |
+
+### Commands
+
+```text
+bash scripts/csir-poc/local-validate-csir-poc.sh
+bash scripts/csir-poc/run-pipeline.sh
+```
+
+```text
+PHASE 5: PASS (feasibility PoC only)
+NEXT: BLOCKED — production LibreWolf CSIR / Full LTO / Rust CSIR / benchmarks require new human authorization
+STOP
+```
+
+
 
 

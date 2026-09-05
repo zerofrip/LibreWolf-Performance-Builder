@@ -517,24 +517,73 @@ NEXT: Phase 6 full-tree C/C++ CSIR authorized — see docs/PHASE6-INTEGRATION.md
 - Stage A base: **own matching LibreWolf IR profile** (upstream `windows.profdata` **not** Stage-A authority)
 - bsys6 `assets/windows.profdata` disabled during A/B/D (`disable_upstream_profdata_asset`) to prevent dual-profile injection (**SOURCE-SUPPORTED**)
 
-### Scaffolding status
+### Stage A build — PASS (run 33957505019)
 
-| Item | Status |
-|------|--------|
-| Integration map + stage mozconfig frags | PRESENT |
-| Training workload `workloads/csir-train/` | PRESENT |
-| `scripts/csir-fulltree/*` Stage A/B/D + merge/train/prove | PRESENT |
-| `scripts/local-validate-csir-fulltree.sh` | PASS (syntax/contract/privacy) |
-| Staged workflow `csir-fulltree.yml` | PRESENT |
-| Stage A full-tree build evidence | PENDING |
-| Stage B–D evidence | PENDING |
+| Field | Value |
+|-------|-------|
+| Run | `33957505019` |
+| Head SHA | `c36252e526966e571542ca347676db9e8c458b76` |
+| run_id | `20260905TPhase6A` |
+| Result | SUCCESS (stage-a-build only; B/D skipped by design) |
+| Inner package | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| Inner size | 215484005 |
+| Inner SHA256 | `c53df027a230d65ad985831603f399748619b99dd2c0daa06f734f847bdf4540` |
+| Wrapper digest | `sha256:c1ab910c2ab1df35c05af2dd45d17cc730e7c2c2b18a19b14638704a96945d89` (artifact wrapper ≠ package) |
+| librewolf.exe SHA256 | `2c7f7c8963cac21dcafc7832185a131130ee043a6a767bddea6d92145c235049` |
+| Instrumentation | `--enable-profile-generate` effective; 3478 `fprofile-generate` target invocations; CSIR OFF |
+| upstream windows.profdata | DISABLED / not Stage-A authority |
+| duration_sec | 9423 |
+| MemTotal | 32646784 kB |
+| SwapTotal | 8388608 kB |
+| memory.peak | 29888290816 (~27.83 GiB) |
+| oom / oom_kill | 0 / 0 |
+| Stage A infrastructure | PASS |
+
+### Stage A Windows training
+
+| Attempt | Result | Classification |
+|---------|--------|----------------|
+| 1 | FAIL — `Permission denied` writing under root-owned runner worktree | **infrastructure / filesystem ownership** (not compiler/PGO/CSIR) |
+| 2 | PASS (profiles collected) | retried on writable repo path + `C:\Users\Public\lwpb-csir-fulltree\...` |
+
+Attempt 2 details:
+
+- Windows: `10.0.26200.9278` x86_64
+- Mechanism: WSL → real Windows `cmd.exe` / `librewolf.exe` (Wine unused)
+- Workload hash: `fb0a10a0edef864eb99f69f2d396b66ba3dd010a1a60330f835d745cc1894362`
+- Network: none (local `file://`)
+- Runs: 1
+- Limitation: headless LibreWolf does **not** auto-quit after loading URLs; after workload settle (~12+ min hang), `taskkill /F` used for profile flush (`browser_exit=1`, clean shutdown = FORCED)
+- GFX SWGL headless warning recorded (non-fatal for IR profile collection)
+
+### Stage A profiles / base.profdata — PASS
+
+| Field | Value |
+|-------|-------|
+| Fresh dir | `profiles/stage-a-raw` empty before attempt 2; attempt 1 produced **no** `.profraw` |
+| Contamination | NONE |
+| profraw count | 18 |
+| total bytes | 411432720 |
+| min / max | 211848 / 134295688 |
+| format | LLVM raw profile v10; all readable by llvm-profdata **21.1.8** |
+| manifest SHA256 | `fabf69cc236e9eef989fb30193cf13b64d65685cd20df7f3b747ea2f403b7cef` |
+| base.profdata size | 114720872 |
+| base.profdata SHA256 | `6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a` |
+| Total functions | 409899 |
+| Max function count | 5941477 |
+| Scale | **plausible full-tree** (browser-scale; mozilla/Gecko symbols present) |
 
 ```text
-PHASE 6: IN PROGRESS
-NEXT: Stage A full-tree instrumented build on self-hosted runner
+STAGE A: PASS
 ```
 
+### Stage B preflight — PASS (host)
 
+- base SHA256 verified
+- clang-cl accepts `-fprofile-use=<base> -fcs-profile-generate=<dir>` (probe TU; CFG mismatch vs LibreWolf expected/non-fatal for probe)
+- upstream `windows.profdata` remains disabled by Stage B orchestration design
 
-
-
+```text
+PHASE 6: IN PROGRESS — Stage A closed; Stage B full-tree build next
+NEXT: Stage B full-tree build (exactly one attempt); STOP before Stage B Windows CSIR training
+```

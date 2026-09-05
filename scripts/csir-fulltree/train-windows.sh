@@ -41,12 +41,35 @@ PROF_PAT="${PROF_WIN}\\csir-%p-%m.profraw"
 
 WORKLOAD_HASH="$( (cd "$WORKLOAD" && find . -type f | sort | xargs sha256sum) | sha256sum | awk '{print $1}' )"
 
+# Headless LibreWolf does not auto-quit after loading file:// URLs.
+# Run under a wall-clock budget, then request process exit so profiles flush.
+TRAIN_TIMEOUT_SEC="${LWPB_CSIR_TRAIN_TIMEOUT_SEC:-180}"
 for ((i=1; i<=RUNS; i++)); do
-  echo "-> Training run $i/$RUNS stage=$STAGE"
+  echo "-> Training run $i/$RUNS stage=$STAGE timeout=${TRAIN_TIMEOUT_SEC}s"
   set +e
   /mnt/c/Windows/System32/cmd.exe /c \
-    "cd /d ${EXE_WIN_DIR} && set MOZ_HEADLESS=1&& set MOZ_DISABLE_CONTENT_SANDBOX=1&& set LLVM_PROFILE_FILE=${PROF_PAT}&& librewolf.exe --headless --profile ${PROF_WIN}\\browser-profile-${i} \"${WL_URL}\" \"file:///$(echo "$(wslpath -w "$STAGE_WIN/workload/page2.html")" | sed 's|\\|/|g')\" \"file:///$(echo "$(wslpath -w "$STAGE_WIN/workload/dom.html")" | sed 's|\\|/|g')\""
-  RC=$?
+    "cd /d ${EXE_WIN_DIR} && set MOZ_HEADLESS=1&& set MOZ_DISABLE_CONTENT_SANDBOX=1&& set LLVM_PROFILE_FILE=${PROF_PAT}&& librewolf.exe --headless --profile ${PROF_WIN}\\browser-profile-${i} \"${WL_URL}\" \"file:///$(echo "$(wslpath -w "$STAGE_WIN/workload/page2.html")" | sed 's|\\|/|g')\" \"file:///$(echo "$(wslpath -w "$STAGE_WIN/workload/dom.html")" | sed 's|\\|/|g')\"" &
+  CMD_PID=$!
+  SECONDS=0
+  while kill -0 "$CMD_PID" 2>/dev/null; do
+    if (( SECONDS >= TRAIN_TIMEOUT_SEC )); then
+      echo "NOTE: training timeout ${TRAIN_TIMEOUT_SEC}s — terminating LibreWolf for profile flush" >&2
+      /mnt/c/Windows/System32/taskkill.exe /IM librewolf.exe /T >/dev/null 2>&1 || true
+      sleep 3
+      /mnt/c/Windows/System32/taskkill.exe /F /IM librewolf.exe /T >/dev/null 2>&1 || true
+      wait "$CMD_PID" 2>/dev/null
+      RC=1
+      break
+    fi
+    sleep 2
+  done
+  if kill -0 "$CMD_PID" 2>/dev/null; then
+    wait "$CMD_PID"
+    RC=$?
+  else
+    wait "$CMD_PID" 2>/dev/null
+    RC=${RC:-$?}
+  fi
   set -e
   echo "browser_exit=${RC}"
 done
@@ -88,3 +111,4 @@ write_stage_meta "${META_DIR}/${STAGE}-train.json" \
   '{stage:$stage,workload_hash:$workload_hash,windows:$windows_ver,runs:$runs,profraw_count:$file_count,profraw_total_bytes:$total_bytes,profile_dir:$profile_dir,package_sha256:$package_sha,deterministic:true,network_dependency:false}'
 
 echo "Training complete: ${#RAWS[@]} profraw files, ${TOTAL} bytes"
+

@@ -9,11 +9,14 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 source "${ROOT}/scripts/csir-fulltree/common.sh"
 
 BASE="${1:?base.profdata}"
+[[ "$BASE" = /* ]] || BASE="${ROOT}/${BASE}"
 require_nonempty "$BASE"
 mkdir -p "${META_DIR}/preflight" "${PROF_DIR}/preflight-cs"
 
 BASE_REL="${BASE#"$ROOT"/}"
 [[ "$BASE_REL" != "$BASE" ]] || { echo "ERROR: base must be under $ROOT" >&2; exit 1; }
+PROF_REL="${PROF_DIR#"$ROOT"/}"
+META_REL="${META_DIR#"$ROOT"/}"
 
 # Minimal C source (not LibreWolf) — only checks compiler/profile acceptance
 cat >"${META_DIR}/preflight/probe.c" <<'EOF'
@@ -29,9 +32,9 @@ export PATH=/root/.mozbuild/clang/bin:\$PATH
 VS=/root/.mozbuild/win-cross/vs
 MSVC=\${VS}/VC/Tools/MSVC/14.50.35717
 SDKVER=10.0.26100.0
-SDK=\${VS}/Windows\ Kits/10
+SDK=\"\${VS}/Windows Kits/10\"
 TARGET=x86_64-pc-windows-msvc
-mkdir -p /src/${PROF_DIR#"$ROOT"/}/preflight-cs
+mkdir -p /src/${PROF_REL}/preflight-cs
 clang-cl -fms-compatibility-version=19.50 --target=\$TARGET \
   -imsvc \"\${MSVC}/include\" \
   -imsvc \"\${SDK}/Include/\${SDKVER}/ucrt\" \
@@ -39,9 +42,9 @@ clang-cl -fms-compatibility-version=19.50 --target=\$TARGET \
   -imsvc \"\${SDK}/Include/\${SDKVER}/um\" \
   -O2 /Ob0 \
   -fprofile-use=/src/${BASE_REL} \
-  -fcs-profile-generate=/src/${PROF_DIR#"$ROOT"/}/preflight-cs \
-  /src/${META_DIR#"$ROOT"/}/preflight/probe.c \
-  -c -Fo/src/${META_DIR#"$ROOT"/}/preflight/probe.obj
+  -fcs-profile-generate=/src/${PROF_REL}/preflight-cs \
+  /src/${META_REL}/preflight/probe.c \
+  -c -Fo/src/${META_REL}/preflight/probe.obj
 " 2>&1 | tee "$LOG"
 RC=${PIPESTATUS[0]}
 set -e
@@ -52,8 +55,6 @@ if grep -Eiq 'malformed instrumentation profile|no profile data available' "$LOG
 fi
 if grep -Eiq 'function control flow change detected|hash mismatch' "$LOG"; then
   echo "WARN: CFG/hash diagnostics on unrelated probe TU (expected for non-matching source)" | tee -a "$LOG"
-  # Unrelated TU will not match LibreWolf CFG — do not treat as fatal for preflight of
-  # 'compiler accepts flags + can open profile'. Material mismatch is a Stage B full-tree gate.
 fi
 [[ "$RC" -eq 0 ]] || { echo "ERROR: preflight compile failed rc=$RC" >&2; exit 1; }
 

@@ -227,9 +227,54 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-  stage-b-build:
+  prepare-base-profile:
     if: inputs.stage == 'B-build'
     needs: guard
+    runs-on: [self-hosted, linux, x64, librewolf-builder]
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Import authoritative base.profdata
+        run: |
+          set -euo pipefail
+          [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
+          DEST="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles"
+          mkdir -p "$DEST" "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta"
+          # Prefer already-present workspace copy; else persistent host repo path
+          if [[ ! -s "${DEST}/base.profdata" ]]; then
+            SRC="/home/zero/github/LibreWolf-Performance-Builder/artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/base.profdata"
+            [[ -s "$SRC" ]] || { echo "ERROR: missing base.profdata at $SRC" >&2; exit 1; }
+            cp -a "$SRC" "${DEST}/base.profdata"
+          fi
+          sha256sum "${DEST}/base.profdata" | tee "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta/base-profdata.sha256"
+          # Expected Phase 6 Stage A authoritative hash (must match or STOP)
+          EXPECT=6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a
+          GOT=$(awk '{print $1}' "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta/base-profdata.sha256")
+          if [[ "$GOT" != "$EXPECT" && "${LWPB_CSIR_ALLOW_BASE_HASH_MISMATCH:-}" != "1" ]]; then
+            echo "ERROR: base.profdata SHA256 mismatch got=$GOT expect=$EXPECT" >&2
+            exit 1
+          fi
+          # Also copy Stage A lineage meta if present on host
+          HMETA="/home/zero/github/LibreWolf-Performance-Builder/artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta"
+          if [[ -d "$HMETA" ]]; then
+            cp -a "$HMETA/." "artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/meta/" || true
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: phase6-base-${{ inputs.run_id }}
+          path: |
+            artifacts/csir-fulltree/runs/${{ inputs.run_id }}/profiles/base.profdata
+            artifacts/csir-fulltree/runs/${{ inputs.run_id }}/meta/
+          retention-days: 14
+
+  stage-b-build:
+    if: inputs.stage == 'B-build'
+    needs: [guard, prepare-base-profile]
     runs-on: [self-hosted, linux, x64, librewolf-builder]
     timeout-minutes: 720
     container:
@@ -257,16 +302,20 @@ jobs:
           path: work/librewolf-155.0-1.source.tar.gz
           key: lw-source-${{ hashFiles('upstream/metadata.json') }}
       - uses: actions/download-artifact@v4
-        continue-on-error: true
         with:
-          pattern: phase6-*
-          merge-multiple: true
+          name: phase6-base-${{ inputs.run_id }}
           path: .
-      - name: Stage B build
+      - name: Stage B preflight + full-tree build
         run: |
+          set -euo pipefail
           [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
           BASE="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/base.profdata"
           test -s "$BASE"
+          GOT=$(sha256sum "$BASE" | awk '{print $1}')
+          EXPECT=6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a
+          echo "base.profdata sha256=$GOT size=$(stat -c%s "$BASE")"
+          [[ "$GOT" == "$EXPECT" || "${LWPB_CSIR_ALLOW_BASE_HASH_MISMATCH:-}" == "1" ]] \
+            || { echo "ERROR: base hash mismatch" >&2; exit 1; }
           bash scripts/csir-fulltree/preflight-stage-b.sh "$BASE"
           bash scripts/csir-fulltree/build-stage-b.sh "$BASE"
       - if: always()
@@ -335,3 +384,4 @@ jobs:
             out/
           if-no-files-found: warn
           retention-days: 14
+

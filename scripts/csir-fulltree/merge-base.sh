@@ -9,6 +9,9 @@ source "${ROOT}/scripts/csir-fulltree/common.sh"
 
 RAW_DIR="${1:-${PROF_DIR}/stage-a-raw}"
 OUT="${2:-${PROF_DIR}/base.profdata}"
+# Resolve to absolute paths under repo (relative args are common)
+[[ "$RAW_DIR" = /* ]] || RAW_DIR="${ROOT}/${RAW_DIR}"
+[[ "$OUT" = /* ]] || OUT="${ROOT}/${OUT}"
 mkdir -p "$(dirname "$OUT")" "$META_DIR"
 
 mapfile -t RAWS < <(find "$RAW_DIR" -type f -name '*.profraw' | sort)
@@ -22,6 +25,7 @@ for f in "${RAWS[@]}"; do
   REL_RAWS+=("$rel")
 done
 OUT_REL="${OUT#"$ROOT"/}"
+[[ "$OUT_REL" != "$OUT" ]] || { echo "ERROR: out not under $ROOT" >&2; exit 1; }
 
 docker run --rm --user root -v "${ROOT}:/src" -w /src "$IMG" bash -lc "
 set -euo pipefail
@@ -51,3 +55,4 @@ write_stage_meta "${META_DIR}/base-profdata.json" \
   '{stage:"A-merge",output:$out,sha256:$sha,bytes:$size,raw_count:$raw_count,show_summary:$show_summary}'
 
 echo "base.profdata OK sha256=$SHA size=$SIZE"
+

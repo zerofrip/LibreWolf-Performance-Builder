@@ -38,13 +38,17 @@ test -f "work/librewolf-${LWPB_FULL_VERSION}.source.tar.gz"
 
 echo "== metadata writer smoke =="
 mkdir -p artifacts
+# Isolate from any leftover Phase 3/4 proof artifacts
+rm -f artifacts/v3-proof.json artifacts/thinlto-proof.json
 scripts/write-build-metadata.sh artifacts/local-validate-metadata.json ok 0 ""
 jq -e '
   .optimizations.overlay_lto == false
+  and .optimizations.overlay_lto_mode == false
   and .optimizations.overlay_pgo == false
   and .optimizations.overlay_optimizations == false
   and .optimizations.x86_64_v3 == false
   and .optimizations.csir == false
+  and .optimizations.upstream_cpp_lto_mode == false
   and (.optimizations | has("upstream_rust_lto"))
   and (.optimizations | has("upstream_pgo"))
   and (.optimizations | has("upstream_cpp_lto"))
@@ -86,5 +90,6 @@ scripts/disk-report.sh local-validate
 echo
 echo "Local validation PASSED (full Windows compile not run)."
 echo "Next: GitHub Actions workflow baseline-windows.yml"
+
 
 

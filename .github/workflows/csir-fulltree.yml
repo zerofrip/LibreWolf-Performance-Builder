@@ -1,0 +1,337 @@
+name: Phase 6 CSIR full-tree (staged)
+
+# Staged LibreWolf C/C++ CSIR integration PoC.
+# Does NOT run benchmarks. Does NOT authorize Rust CSIR / Full LTO / release.
+#
+# Jobs:
+#   A build  — self-hosted linux container (bsys6:windows)
+#   A train  — self-hosted host (WSL→Windows interop; no container)
+#   A merge  — self-hosted host + docker llvm-profdata
+#   B/C/D    — same pattern; start_from selects entry
+#
+# Windows training uses WSL interop on the existing librewolf-builder host.
+# No separate GitHub Windows runner is invented.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_runner_ready:
+        description: "Type READY if self-hosted runner is online"
+        required: true
+        type: string
+        default: ""
+      stage:
+        description: "Stage to run"
+        required: true
+        type: choice
+        options:
+          - local-validate
+          - A-build
+          - A-train
+          - A-merge
+          - B-preflight
+          - B-build
+          - B-train
+          - C-merge
+          - D-build
+          - D-smoke
+          - prove
+        default: local-validate
+      run_id:
+        description: "Reuse LWPB_CSIR_RUN_ID (required for train/merge after build)"
+        required: false
+        type: string
+        default: ""
+      package_artifact:
+        description: "Optional path under artifacts/csir-fulltree for train/smoke"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  group: csir-fulltree-phase6
+  cancel-in-progress: false
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require READY
+        env:
+          CONFIRM: ${{ inputs.confirm_runner_ready }}
+        run: |
+          if [ "$CONFIRM" != "READY" ]; then
+            echo "Refusing: confirm_runner_ready must be READY" >&2
+            exit 1
+          fi
+
+  local-validate:
+    if: inputs.stage == 'local-validate'
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y jq git-lfs
+      - run: bash scripts/local-validate-csir-fulltree.sh
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-local-validate
+          path: artifacts/csir-fulltree/
+          if-no-files-found: warn
+
+  stage-a-build:
+    if: inputs.stage == 'A-build'
+    needs: guard
+    runs-on: [self-hosted, linux, x64, librewolf-builder]
+    timeout-minutes: 720
+    container:
+      image: codeberg.org/librewolf/bsys6:windows
+      options: --user root
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: windows
+      ARCH: x86_64
+      LTO: ""
+      MOZ_PGO: ""
+      HOME: /root
+      MOZBUILD: /root/.mozbuild
+      MOZBUILD_STATE_PATH: /root/.mozbuild
+      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      LWPB_BUILD_PHASE: 6-csir-base-gen
+      LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
+      MOZ_MAKE_FLAGS: "-j2"
+      LWPB_TRY_SWAP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          apt-get update
+          apt-get install -y jq git curl ca-certificates git-lfs procps unzip file
+          git lfs install
+      - uses: actions/cache@v4
+        with:
+          path: work/librewolf-155.0-1.source.tar.gz
+          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
+      - name: Local validate (inside image)
+        run: bash scripts/local-validate-csir-fulltree.sh
+      - name: Memory preflight
+        run: |
+          bash scripts/memory-report.sh full memory-pre-build
+          grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree):' /proc/meminfo || true
+          df -h
+      - name: Stage A full-tree build
+        run: |
+          if [[ -z "${LWPB_CSIR_RUN_ID}" ]]; then
+            export LWPB_CSIR_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
+            echo "Generated RUN_ID=${LWPB_CSIR_RUN_ID}"
+          fi
+          echo "LWPB_CSIR_RUN_ID=${LWPB_CSIR_RUN_ID}" >> "$GITHUB_ENV"
+          bash scripts/csir-fulltree/build-stage-a.sh
+      - if: always()
+        run: |
+          bash scripts/memory-report.sh full memory-post-build || true
+          bash scripts/memory-report.sh summary || true
+          cat artifacts/memory-summary.json 2>/dev/null || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-stage-a-${{ env.LWPB_CSIR_RUN_ID || 'unknown' }}
+          path: |
+            artifacts/csir-fulltree/
+            artifacts/memory-summary.json
+            artifacts/disk/
+            out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  host-stage:
+    if: contains(fromJSON('["A-train","A-merge","B-preflight","B-train","C-merge","D-smoke","prove"]'), inputs.stage)
+    needs: guard
+    runs-on: [self-hosted, linux, x64, librewolf-builder]
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+    env:
+      LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require run_id
+        if: inputs.stage != 'prove'
+        run: |
+          if [[ -z "${LWPB_CSIR_RUN_ID}" ]]; then
+            echo "ERROR: run_id required for ${{ inputs.stage }}" >&2
+            exit 1
+          fi
+      - name: Download prior artifacts if present
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: phase6-*
+          merge-multiple: true
+          path: .
+      - name: Run host stage
+        env:
+          STAGE: ${{ inputs.stage }}
+          PKG_HINT: ${{ inputs.package_artifact }}
+        run: |
+          set -euo pipefail
+          RUN="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}"
+          case "$STAGE" in
+            A-train)
+              PKG="${PKG_HINT:-}"
+              if [[ -z "$PKG" ]]; then
+                PKG="$(find "$RUN/out" out -name 'librewolf-*-windows-x86_64-package.zip' 2>/dev/null | head -1)"
+              fi
+              [[ -n "$PKG" && -f "$PKG" ]] || { echo "ERROR: package zip missing" >&2; exit 1; }
+              mkdir -p "$RUN/profiles/stage-a-raw"
+              bash scripts/csir-fulltree/train-windows.sh "$PKG" "$RUN/profiles/stage-a-raw" stage-a
+              ;;
+            A-merge)
+              bash scripts/csir-fulltree/merge-base.sh "$RUN/profiles/stage-a-raw" "$RUN/profiles/base.profdata"
+              ;;
+            B-preflight)
+              bash scripts/csir-fulltree/preflight-stage-b.sh "$RUN/profiles/base.profdata"
+              ;;
+            B-train)
+              PKG="${PKG_HINT:-}"
+              if [[ -z "$PKG" ]]; then
+                PKG="$(find "$RUN/out" out -name 'librewolf-*-windows-x86_64-package.zip' 2>/dev/null | head -1)"
+              fi
+              mkdir -p "$RUN/profiles/stage-b-raw"
+              bash scripts/csir-fulltree/train-windows.sh "$PKG" "$RUN/profiles/stage-b-raw" stage-b
+              ;;
+            C-merge)
+              bash scripts/csir-fulltree/merge-combined.sh \
+                "$RUN/profiles/stage-b-raw" "$RUN/profiles/base.profdata" "$RUN/profiles"
+              ;;
+            D-smoke)
+              PKG="${PKG_HINT:-}"
+              if [[ -z "$PKG" ]]; then
+                PKG="$(find "$RUN/out" out -name 'librewolf-*-windows-x86_64-package.zip' 2>/dev/null | head -1)"
+              fi
+              bash scripts/csir-fulltree/smoke-windows.sh "$PKG"
+              ;;
+            prove)
+              bash scripts/csir-fulltree/prove-csir-fulltree.sh "$RUN"
+              ;;
+          esac
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-host-${{ inputs.stage }}-${{ inputs.run_id || 'na' }}
+          path: artifacts/csir-fulltree/
+          if-no-files-found: warn
+          retention-days: 14
+
+  stage-b-build:
+    if: inputs.stage == 'B-build'
+    needs: guard
+    runs-on: [self-hosted, linux, x64, librewolf-builder]
+    timeout-minutes: 720
+    container:
+      image: codeberg.org/librewolf/bsys6:windows
+      options: --user root
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: windows
+      ARCH: x86_64
+      LTO: ""
+      HOME: /root
+      MOZBUILD: /root/.mozbuild
+      MOZBUILD_STATE_PATH: /root/.mozbuild
+      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
+      MOZ_MAKE_FLAGS: "-j2"
+      LWPB_TRY_SWAP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: apt-get update && apt-get install -y jq git curl ca-certificates git-lfs procps unzip file && git lfs install
+      - uses: actions/cache@v4
+        with:
+          path: work/librewolf-155.0-1.source.tar.gz
+          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: phase6-*
+          merge-multiple: true
+          path: .
+      - name: Stage B build
+        run: |
+          [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
+          BASE="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/base.profdata"
+          test -s "$BASE"
+          bash scripts/csir-fulltree/preflight-stage-b.sh "$BASE"
+          bash scripts/csir-fulltree/build-stage-b.sh "$BASE"
+      - if: always()
+        run: bash scripts/memory-report.sh summary || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-stage-b-${{ inputs.run_id }}
+          path: |
+            artifacts/csir-fulltree/
+            artifacts/memory-summary.json
+            out/
+          if-no-files-found: warn
+          retention-days: 14
+
+  stage-d-build:
+    if: inputs.stage == 'D-build'
+    needs: guard
+    runs-on: [self-hosted, linux, x64, librewolf-builder]
+    timeout-minutes: 720
+    container:
+      image: codeberg.org/librewolf/bsys6:windows
+      options: --user root
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: windows
+      ARCH: x86_64
+      LTO: ""
+      HOME: /root
+      MOZBUILD: /root/.mozbuild
+      MOZBUILD_STATE_PATH: /root/.mozbuild
+      PATH: /root/.cargo/bin:/root/.mozbuild/clang/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      LWPB_CSIR_RUN_ID: ${{ inputs.run_id }}
+      MOZ_MAKE_FLAGS: "-j2"
+      LWPB_TRY_SWAP: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: apt-get update && apt-get install -y jq git curl ca-certificates git-lfs procps unzip file && git lfs install
+      - uses: actions/cache@v4
+        with:
+          path: work/librewolf-155.0-1.source.tar.gz
+          key: lw-source-${{ hashFiles('upstream/metadata.json') }}
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: phase6-*
+          merge-multiple: true
+          path: .
+      - name: Stage D final build
+        run: |
+          [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
+          COMB="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/combined.profdata"
+          test -s "$COMB"
+          bash scripts/csir-fulltree/build-stage-d.sh "$COMB"
+      - if: always()
+        run: bash scripts/memory-report.sh summary || true
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-stage-d-${{ inputs.run_id }}
+          path: |
+            artifacts/csir-fulltree/
+            artifacts/memory-summary.json
+            out/
+          if-no-files-found: warn
+          retention-days: 14

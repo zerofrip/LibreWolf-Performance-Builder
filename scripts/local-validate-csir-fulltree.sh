@@ -19,6 +19,8 @@ bash -n scripts/csir-fulltree/apply-stage-b-mozconfig.sh
 bash -n scripts/csir-fulltree/preflight-stage-b.sh
 bash -n scripts/csir-fulltree/prove-csir-fulltree.sh
 bash -n scripts/csir-fulltree/smoke-windows.sh
+bash -n scripts/csir-fulltree/normalize-base-profdata.sh
+bash -n scripts/csir-fulltree/test-base-artifact-layout.sh
 
 command -v jq >/dev/null
 jq -e '.phase == "6-csir-fulltree"' configs/phase6-csir-fulltree.contract.json
@@ -29,6 +31,7 @@ grep -q 'LWPB_PHASE6_CSIR_BASE_GEN' configs/mozconfig.csir-base-gen.frag
 grep -q 'enable-profile-generate' configs/mozconfig.csir-base-gen.frag
 grep -q 'LWPB_PHASE6_CSIR_CS_GEN' configs/mozconfig.csir-cs-gen.frag
 grep -q 'LWPB_PHASE6_CSIR_FINAL' configs/mozconfig.csir-final.frag
+grep -q 'normalize-base-profdata.sh' .github/workflows/csir-fulltree.yml
 
 # Workload present + deterministic hash
 test -f workloads/csir-train/index.html
@@ -43,6 +46,15 @@ bash scripts/check-privacy-invariants.sh
 test -f docs/PHASE6-INTEGRATION.md
 grep -qi 'own matching LibreWolf IR profile' docs/PHASE6-INTEGRATION.md
 
+# Artifact layout normalization (requires authoritative base.profdata on disk)
+if [[ -s artifacts/csir-fulltree/runs/20260905TPhase6A/profiles/base.profdata ]]; then
+  bash scripts/csir-fulltree/test-base-artifact-layout.sh \
+    | tee artifacts/csir-fulltree/local-validate/base-artifact-layout.txt
+else
+  echo "ERROR: authoritative base.profdata missing for layout tests" >&2
+  exit 1
+fi
+
 # Probe CSIR flags if docker image available (optional)
 if command -v docker >/dev/null 2>&1 \
   && docker image inspect codeberg.org/librewolf/bsys6:windows >/dev/null 2>&1; then
@@ -56,3 +68,4 @@ fi
 grep -q 'disable_upstream_profdata_asset' scripts/csir-fulltree/common.sh
 
 echo "PHASE6_LOCAL_VALIDATE=PASS"
+

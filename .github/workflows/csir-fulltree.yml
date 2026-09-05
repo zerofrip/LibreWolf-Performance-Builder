@@ -319,22 +319,14 @@ jobs:
         run: |
           set -euo pipefail
           [[ -n "${LWPB_CSIR_RUN_ID}" ]] || { echo "run_id required" >&2; exit 1; }
+          chmod +x scripts/csir-fulltree/*.sh
+          # Deterministic layout normalize → ONE canonical path; hash is authority.
+          # Do NOT set LWPB_CSIR_ALLOW_BASE_HASH_MISMATCH for Phase 6 authority runs.
+          unset LWPB_CSIR_ALLOW_BASE_HASH_MISMATCH || true
+          bash scripts/csir-fulltree/normalize-base-profdata.sh "${LWPB_CSIR_RUN_ID}" .
           BASE="artifacts/csir-fulltree/runs/${LWPB_CSIR_RUN_ID}/profiles/base.profdata"
-          mkdir -p "$(dirname "$BASE")"
-          # upload-artifact may place file at ./base.profdata or ./profiles/base.profdata
-          if [[ ! -s "$BASE" ]]; then
-            if [[ -s profiles/base.profdata ]]; then
-              mv -f profiles/base.profdata "$BASE"
-            elif [[ -s base.profdata ]]; then
-              mv -f base.profdata "$BASE"
-            fi
-          fi
-          test -s "$BASE" || { echo "ERROR: base.profdata missing after artifact normalize" >&2; find . -name 'base.profdata' -ls >&2 || true; exit 1; }
-          GOT=$(sha256sum "$BASE" | awk '{print $1}')
-          EXPECT=6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a
-          echo "base.profdata sha256=$GOT size=$(stat -c%s "$BASE") path=$BASE"
-          [[ "$GOT" == "$EXPECT" || "${LWPB_CSIR_ALLOW_BASE_HASH_MISMATCH:-}" == "1" ]] \
-            || { echo "ERROR: base hash mismatch" >&2; exit 1; }
+          test -s "$BASE"
+          echo "Stage B canonical base: $BASE $(sha256sum "$BASE")"
           bash scripts/csir-fulltree/preflight-stage-b.sh "$BASE"
           bash scripts/csir-fulltree/build-stage-b.sh "$BASE"
       - if: always()
@@ -403,5 +395,6 @@ jobs:
             out/
           if-no-files-found: warn
           retention-days: 14
+
 
 

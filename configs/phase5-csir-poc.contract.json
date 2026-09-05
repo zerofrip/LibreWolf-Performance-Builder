@@ -1,0 +1,23 @@
+{
+  "phase": "5-csir-poc",
+  "scope": "standalone Windows-target CSIR PGO feasibility PoC only",
+  "not_authorized": [
+    "production LibreWolf CSIR mozconfig",
+    "Rust CSIR",
+    "custom LLVM",
+    "custom Rust",
+    "full browser CSIR build"
+  ],
+  "windows_execution": "WSL2 interop to real Windows PE loader (not Wine)",
+  "pipeline": [
+    "A: -fprofile-generate -> Windows run -> profraw -> llvm-profdata merge -> base.profdata",
+    "B: -fprofile-use=base.profdata -fcs-profile-generate=<dir> -> Windows run -> CS profraw",
+    "C: llvm-profdata merge base.profdata cs.profdata -> combined.profdata",
+    "D: -fprofile-use=combined.profdata -> Windows run"
+  ],
+  "notes": [
+    "-fprofile-generate and -fcs-profile-generate rejected in the same compile (Clang 21.1.8)",
+    "CS profiles require llvm-profdata show --showcs",
+    "/Ob0 used to keep CFG stable between Stage A and Stage B"
+  ]
+}

@@ -338,3 +338,39 @@ STOP
 
 Prior failed attempts (historical): `33927389796` (CC=*.sh configure reject); `33929591494` (full package built; CI false-failed on pipefail PE check — fixed in `a1936cc`/`627e036`).
 
+## GHA run 33946910750 (FAILED — Phase 4 ThinLTO, pre-compile)
+
+First authorized Phase 4 attempt. Workflow: **Windows x86-64-v3 + ThinLTO (self-hosted manual)** / commit `9169ed9` / conclusion **FAILURE**.
+
+### Preflight (this run)
+
+| Gate | Result |
+|------|--------|
+| guard `confirm_runner_ready=READY` | PASS |
+| `scripts/local-validate-thinlto.sh` (GHA ubuntu-latest) | PASS |
+| ThinLTO clang-cl probe (local docker image, pre-dispatch) | PASS — clang `21.1.8`, lld-link `21.1.8`, `-flto=thin` → LLVM IR bitcode |
+
+### First causal failure
+
+| Field | Value |
+|-------|-------|
+| LAST SUCCESSFUL STAGE | Verify: `verify-thinlto-config` + `verify-v3-config` + `check-privacy-invariants` (**PRIVACY_INVARIANTS=PASS**) |
+| FIRST FAILING COMMAND | `bash scripts/verify-baseline-config.sh` (workflow step “Verify Phase 4 config + privacy invariants”) |
+| COMPONENT | CI env / Phase 2 baseline env guard |
+| ERROR | `Phase 2 forbids LTO=false (upstream-equivalent baseline only)` |
+| MEMORY PEAK (job end sample) | ~2.94 GiB (`memory.peak`); not relevant to this failure |
+| SWAP | not material |
+| OOM / OOM_KILL | 0 / 0 |
+| DISK | not causal |
+
+**Root cause:** reusable workflow set `LTO: "false"` so bsys6 would not inject Full/cross LTO. That non-empty value is rejected by `verify-baseline-config.sh` (Phase 2 forbids *any* set `LTO`). Phase 3 correctly used `LTO: ""` and only unset/false inside the build script after verification.
+
+**Fix applied (not auto-retried):** `thinlto-windows-reusable.yml` now uses `LTO: ""`; `build-windows-thinlto.sh` still exports `LTO=false` after the baseline gate.
+
+```text
+PHASE 4: FAILED (first attempt) — pre-compile workflow env guard
+NEXT: corrected workflow ready; full ThinLTO build requires explicit re-dispatch authorization
+STOP — do not auto-retry; do not weaken ThinLTO / enable Full LTO / CSIR
+```
+
+

@@ -175,10 +175,12 @@ grep -Eq -- '--enable-profile-use' "$MOZCONFIG_PATH" \
   || { echo "ERROR: profile-use missing" >&2; exit 1; }
 grep -Fq -- "$(cd "$(dirname "$BASE_PROF")" && pwd)/$(basename "$BASE_PROF")" "$MOZCONFIG_PATH" \
   || { echo "ERROR: base.profdata path missing from mozconfig" >&2; exit 1; }
-if grep -Eq -- '--enable-profile-generate' "$MOZCONFIG_PATH"; then
+if grep -Eq '^[[:space:]]*ac_add_options[[:space:]]+--enable-profile-generate' "$MOZCONFIG_PATH"; then
   echo "ERROR: profile-generate must be OFF in Stage B" >&2
+  grep -n 'profile-generate' "$MOZCONFIG_PATH" >&2 || true
   exit 1
 fi
+# Comments mentioning profile-generate are allowed; only active ac_add_options count.
 if grep -Eq -- 'windows\.profdata' "$MOZCONFIG_PATH"; then
   echo "ERROR: upstream windows.profdata must not appear in Stage B" >&2
   exit 1
@@ -265,3 +267,4 @@ bash "${ROOT}/scripts/prove-march-v3.sh" \
 "${ROOT}/scripts/check-privacy-invariants.sh"
 STATUS="ok"
 echo "Stage B package complete: $ARTIFACT base_sha=$BASE_SHA"
+

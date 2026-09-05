@@ -75,7 +75,8 @@ Mozilla Firefox → LibreWolf source → bsys6 → our overlay → Windows x64 a
 | 2 | Upstream-equivalent Windows x64 CI | **PASS** (self-hosted run `33895224558`) |
 | 3 | x86-64-v3 separate config | **PASS** (self-hosted run `33938729218`; C/C++/Rust proven) |
 | 4 | ThinLTO (Windows x64 + x86-64-v3) | **PASS** — attempt 1 `33946910750` failed pre-compile; fix `520e712`; attempt 2 `33947898216` SUCCESS (see EVIDENCE) |
-| 5+ | CSIR PGO / Full LTO / further opts | **BLOCKED** — needs new human authorization |
+| 5 | CSIR PGO feasibility PoC | **PASS** — pinned Clang 21.1.8 Windows-target pipeline proven locally (WSL→Windows interop); production LibreWolf CSIR **not** implemented |
+| 6+ | production CSIR / Full LTO / further opts | **BLOCKED** — needs new human authorization |
 | 6+ | Workload / privacy / bench / update automation | Not authorized yet |
 
 ## Phase 2 design (authorized)
@@ -113,7 +114,7 @@ Resource guidance (updated after measured self-hosted PASS `33895224558`):
 128 GiB+:   future Full C/C++ LTO only; not required for current Phase 2
 ```
 
-See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3 is **PASS**. Phase 4 ThinLTO is **PASS** (run `33947898216`). CSIR / Full LTO / further phases remain **BLOCKED** until explicit human authorization.
+See `docs/SELF-HOSTED.md` and `docs/EVIDENCE.md`. Phase 3–4 are **PASS**. Phase 5 CSIR PoC is **PASS** (standalone; not production LibreWolf CSIR). Production CSIR / Full LTO / further phases remain **BLOCKED** until explicit human authorization.
 
 GHA standard public `ubuntu-latest` is **INSUFFICIENT** for upstream-equivalent `gkrust` Rust LTO (OOM CONFIRMED, run `33862245103`). Prefer self-hosted with measured headroom; do not weaken baseline flags.
 
@@ -227,6 +228,7 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` �
 `scripts/verify-windows-target.sh` fails the job if the obsolete mingw triple would be generated. No silent rewrite.
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
+
 
 
 

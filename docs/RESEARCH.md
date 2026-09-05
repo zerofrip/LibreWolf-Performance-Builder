@@ -242,9 +242,24 @@ Clang Users Manual workflow:
 
 `-fcs-profile-generate` instruments **after inlining**; cannot be combined with `-fprofile-generate` in the same compile.
 
-**UNKNOWN (CSIR / later-phase gate)**
+**PROVEN (Phase 5 PoC — Clang 21.1.8 / x86_64-pc-windows-msvc)**
 
-Exact current merge semantics (weights, sparse/indexed forms, CSIR-specific merge flags) must be re-verified from authoritative LLVM/Clang docs/source **before** CSIR implementation. Do not assume a naive `merge base.profdata cs.profraw` is sufficient.
+Pinned toolchain CSIR pipeline on a minimal Windows-target program:
+
+1. `-fprofile-generate` → Windows run → `.profraw` → `llvm-profdata merge` → `base.profdata`
+2. `-fprofile-use=base.profdata -fcs-profile-generate=<dir>` → Windows run → CS `.profraw`
+3. `llvm-profdata merge base.profdata cs.profdata` → `combined.profdata`
+4. `-fprofile-use=combined.profdata` final PE (consumption proven by PE hash ≠ no-profile build)
+
+`-fprofile-generate` and `-fcs-profile-generate` in the **same** compile are **rejected** (`invalid argument '-fcs-profile-generate' not allowed with '-fprofile-generate'`).
+
+CS profiles require `llvm-profdata show --showcs` (without it: Total functions = 0).
+
+**UNPROVEN:** using upstream `windows.profdata` as the CSIR Stage-A base for a future LibreWolf tree CSIR build (IR-format compatible; source/hash correspondence not established).
+
+**UNKNOWN (production CSIR / later-phase gate)**
+
+Exact merge/operational requirements for a full Firefox/LibreWolf CSIR double-instrumented build (jarlog, orderfile, RAM) remain for a separately authorized phase. Do not assume a naive drop-in of `-fcs-profile-generate` into mozconfig.
 
 Firefox has no first-class CSIR switch; integration must be an overlay, not `MOZ_PGO=1` alone.
 
@@ -395,6 +410,7 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 | U6 | Wine-based Windows profile collection viability |
 | U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
 | U8 | ~~Whether cgroup oom_kill is readable on GHA container jobs~~ → **CLOSED**: readable (`oom_kill=1`). Kernel `dmesg` still often blocked (`Operation not permitted`). |
+
 
 
 

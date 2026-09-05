@@ -413,9 +413,7 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 | U7 | Official `epsilon` runner RAM / swap / cgroup memory limits (not published in bsys6) |
 | U8 | ~~Whether cgroup oom_kill is readable on GHA container jobs~~ → **CLOSED**: readable (`oom_kill=1`). Kernel `dmesg` still often blocked (`Operation not permitted`). |
 
+### Phase 6 status (Stage C)
 
-
-
-
-
-
+- Stages A/B/C **PASS**; authoritative `combined.profdata` SHA256 `bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9`.
+- Stage D **NOT STARTED**.

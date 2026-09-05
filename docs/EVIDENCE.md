@@ -584,7 +584,7 @@ STAGE A: PASS
 - upstream `windows.profdata` remains disabled by Stage B orchestration design
 
 ```text
-PHASE 6: IN PROGRESS — Stage A PASS; Stage B full-tree PASS; Stage B Windows CSIR training PASS; Stage C not started
+PHASE 6: IN PROGRESS — Stages A/B/C PASS; Stage D not started
 ```
 
 ### Stage B attempt 33966109684 — FAIL (pre-build only)
@@ -687,5 +687,29 @@ STAGE B: PASS
 STAGE C: NOT STARTED
 STAGE D: NOT STARTED
 PHASE 6: IN PROGRESS — await human review before Stage C (base+cs merge)
+```
+
+### Stage C combined profile merge — PASS
+
+| Field | Value |
+|-------|-------|
+| Command | `llvm-profdata merge -output=combined.profdata base.profdata cs.profdata` |
+| llvm-profdata | **21.1.8** (bsys6 image `/root/.mozbuild/clang/bin`) |
+| base SHA256 | `6b57dfaba67d480726cabb016bb4a64fface2cbe79e8181ef65182514f17099a` (unchanged) |
+| cs SHA256 | `068c1a158d6933974fa45365903f98ff6404b8700a6bd0f4ce858952744d5f7e` (unchanged) |
+| combined size / SHA256 | 150638760 / `bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9` |
+| merge warnings | **NONE** (empty stdout/stderr) |
+| ordinary view | Total functions **409899**; Max count 5941477; blocks 2576710 |
+| --showcs view | Total functions **413650**; Max count 3695018; blocks 2712692 |
+| dual-view | BOTH PRESENT / browser-scale |
+| scale | **PLAUSIBLE FULL-TREE** |
+| lightweight `-fprofile-use` probe | PASS (clang-cl 21.1.8 / `x86_64-pc-windows-msvc`) |
+| lightweight v3 + ThinLTO + profile-use | PASS (parse/acceptance only; **not** Stage D) |
+| Stage D | **NOT STARTED** |
+
+```text
+STAGE C: PASS
+STAGE D: NOT STARTED
+PHASE 6: IN PROGRESS — await human review before Stage D final build
 ```
 

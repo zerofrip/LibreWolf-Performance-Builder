@@ -241,10 +241,7 @@ Do not use stale GitLab `master` revisions that still emit `x86_64-pc-mingw32` â
 
 Upstream bsys6 may inject `--enable-profile-use` when `assets/windows.profdata` (Git LFS) is present; that is upstream behavior, not an overlay optimization.
 
+### Phase 6 status (Stage C)
 
-
-
-
-
-
-
+- Stages A/B/C **PASS**; authoritative `combined.profdata` SHA256 `bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9`.
+- Stage D **NOT STARTED**.

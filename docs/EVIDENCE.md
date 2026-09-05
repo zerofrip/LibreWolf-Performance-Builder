@@ -596,3 +596,13 @@ NEXT: Stage B full-tree build (exactly one attempt); STOP before Stage B Windows
 - Classification: **CI / preflight** (not profile mismatch; expensive full-tree compile **not started**)
 - Host preflight already PASS; fix: run clang-cl in-image when already inside bsys6 container
 
+### Stage B attempt 33966732281 — FAIL (pre-build path normalize)
+
+- `prepare-base-profile`: PASS (base SHA256 `6b57dfab…099a` uploaded)
+- Artifact wrapper digest: `sha256:151d3f0a5abc7b39b8ea8301cd44b157faa4d53c441fec9160c75073b88bf962`
+- Download: PASS; extracted layout is `profiles/base.profdata` (upload-artifact LCA root)
+- `stage-b-build`: FAIL at `test -s artifacts/.../profiles/base.profdata` (path not found)
+- memory.peak at failure: ~2.33 GiB; oom 0 — expensive compile **not started**
+- Classification: **CI / artifact path layout** (PRE-BUILD)
+- Fix prepared (not auto-dispatched): normalize `./base.profdata` or `./profiles/base.profdata` → canonical path
+

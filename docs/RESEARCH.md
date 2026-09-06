@@ -417,3 +417,9 @@ Do **not** strip upstream PGO or Firefox Rust gkrust LTO just to make GHA green 
 
 - Stages A/B/C **PASS**; authoritative `combined.profdata` SHA256 `bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9`.
 - Stage D **NOT STARTED**.
+
+### Phase 6 status (Stage D close)
+
+- Phase 6 **PASS** (A/B/C/D).
+- Final package SHA256 `e05238f21773a6739b23873d600ef7ac38aa52700096dbf633cec08972dbff35`.
+- Benchmarking / release: **NOT AUTHORIZED**.

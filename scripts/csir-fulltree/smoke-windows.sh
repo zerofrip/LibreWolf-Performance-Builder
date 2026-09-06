@@ -60,9 +60,21 @@ else
 fi
 set -e
 
-# Evidence of initialization: browser profile dir created and/or headless log markers
+# Evidence of initialization: browser profile populated under Windows path
+sleep 2
 INIT=0
-[[ -d "$SMOKE_WIN/profile" ]] && find "$SMOKE_WIN/profile" -type f 2>/dev/null | grep -q . && INIT=1 || true
+if [[ -d "$SMOKE_WIN/profile" ]]; then
+  if find "$SMOKE_WIN/profile" \( -type f -o -type d \) ! -path "$SMOKE_WIN/profile" 2>/dev/null | grep -q .; then
+    INIT=1
+  fi
+fi
+# Fallback: known Firefox profile marker dirs (WSL find can lag on NTFS)
+for marker in prefs.js times.json compatibility.ini startupCache storage cache2; do
+  if [[ -e "$SMOKE_WIN/profile/$marker" ]]; then
+    INIT=1
+    break
+  fi
+done
 
 WIN_VER="$(/mnt/c/Windows/System32/cmd.exe /c ver 2>/dev/null | tr -d '\r' | tail -1 || true)"
 

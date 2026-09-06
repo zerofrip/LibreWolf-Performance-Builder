@@ -584,7 +584,7 @@ STAGE A: PASS
 - upstream `windows.profdata` remains disabled by Stage B orchestration design
 
 ```text
-PHASE 6: IN PROGRESS — Stages A/B/C PASS; Stage D not started
+PHASE 6: PASS — Stages A/B/C/D closed (final CSIR + v3 + ThinLTO)
 ```
 
 ### Stage B attempt 33966109684 — FAIL (pre-build only)
@@ -711,5 +711,43 @@ PHASE 6: IN PROGRESS — await human review before Stage C (base+cs merge)
 STAGE C: PASS
 STAGE D: NOT STARTED
 PHASE 6: IN PROGRESS — await human review before Stage D final build
+```
+
+### Unrelated run 33989405325 — NOT Stage C/D
+
+- Jobs: `local-validate` FAIL; baseline skipped
+- Failure: `curl: (92) HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR` during source tarball download
+- Classification: **UNRELATED NETWORK / LOCAL-VALIDATE**
+- Does **not** invalidate Stage C combined.profdata evidence
+
+### Stage D final full-tree build 33996826475 — PASS
+
+| Field | Value |
+|-------|-------|
+| URL | https://github.com/zerofrip/LibreWolf-Performance-Builder/actions/runs/33996826475 |
+| head SHA | `9fb26f077775a03cde066facff81814147be19c1` |
+| mode | `D-build` |
+| combined SHA256 | `bd3b9602c8131568b7d95177f53748e09257655297b9fe7247dea330b55e56a9` |
+| duration_sec | 8906 (~2.47 h) |
+| memory.peak | 29086027776 (~27.1 GiB); oom 0 |
+| C/C++ combined `-fprofile-use` | **3463** clang-cl invocations |
+| C/C++ ThinLTO | PROVEN (`thinlto-proof.json`; 4104 flto=thin) |
+| C/C++ x86-64-v3 | PROVEN (4104 `-march=x86-64-v3`) |
+| `-fprofile-generate` / `-fcs-profile-generate` / Full LTO | ABSENT |
+| Rust x86-64-v3 | PROVEN |
+| Rust LTO | PROVEN (`gkrust` `-Clto`) |
+| Rust CSIR / Rust PGO | OFF |
+| package | `librewolf-155.0-1-windows-x86_64-package.zip` |
+| package size / SHA256 | 155467675 / `e05238f21773a6739b23873d600ef7ac38aa52700096dbf633cec08972dbff35` |
+| librewolf.exe SHA256 | `7fc688152c446b2f8b9daf6b42e5c9b631af08120a83b333109763d2ea62da06` |
+| artifact wrapper | `sha256:4cd61b3334fd3505940860ebd91b224155efb04e466d1fa6ab9ce10d3abb1109` |
+| Windows smoke | PASS (headless; controlled timeout exit; profile initialized; no illegal instruction / missing DLL) |
+| privacy invariants | PASS |
+| profile diagnostics | NONE material |
+
+```text
+STAGE D: PASS
+PHASE 6: PASS
+NEXT: BLOCKED — awaiting explicit human authorization (benchmarks / release not authorized)
 ```
 
